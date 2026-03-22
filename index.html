@@ -854,9 +854,9 @@ async function fetchSkulKritters(ownerAddress) {
     tokenIds.push(parseInt(tidHex, 16));
   }
 
-  // Step 3: fetch tokenURI for each (batched with Promise.all, max 10 at a time)
+  // Step 3: fetch tokenURI for each token
   const nfts = [];
-  const BATCH = 8;
+  const BATCH = 6;
   for (let b = 0; b < tokenIds.length; b += BATCH) {
     const batch = tokenIds.slice(b, b + BATCH);
     const uriResults = await Promise.all(batch.map(async tid => {
@@ -865,38 +865,31 @@ async function fetchSkulKritters(ownerAddress) {
           to: COLLECTION_ADDRESS,
           data: '0xc87b56dd' + tid.toString(16).padStart(64,'0')
         }, 'latest']);
-        // Decode ABI-encoded string from hex
         const uri = decodeABIString(uriHex);
+        console.log('[Kritter] tokenId', tid, 'raw URI:', uri);
         return { tid, uri };
       } catch(e) {
+        console.warn('[Kritter] tokenURI call failed for', tid, e);
         return { tid, uri: null };
       }
     }));
+
     for (const { tid, uri } of uriResults) {
       let meta = null;
       if (uri) {
         try {
-          // Handle ipfs:// and data: URIs
-          const url = uri.startsWith('ipfs://')
-            ? 'https://ipfs.io/ipfs/' + uri.slice(7)
-            : uri.startsWith('data:')
-            ? uri
-            : uri;
-          if (url.startsWith('data:')) {
-            const b64 = url.split(',')[1];
-            meta = JSON.parse(atob(b64));
-          } else {
-            const r = await fetch(url);
-            meta = await r.json();
-          }
-        } catch(e) { /* ignore metadata fetch errors */ }
+          meta = await fetchMetadata(uri);
+          console.log('[Kritter] metadata for', tid, meta);
+        } catch(e) {
+          console.warn('[Kritter] metadata fetch failed for', tid, e);
+        }
       }
       const existing = state.nfts.find(n => n.tokenId === tid);
       nfts.push({
         tokenId: tid,
         id: '#' + String(tid).padStart(4,'0'),
-        name: meta?.name || 'Skul Kritter #' + tid,
-        image: resolveIpfs(meta?.image || ''),
+        name: (meta && meta.name) ? meta.name : 'Skul Kritter #' + tid,
+        image: (meta && meta.image) ? resolveIpfs(meta.image) : '',
         bg: '#120810',
         staked: existing ? existing.staked : false,
       });
@@ -905,24 +898,93 @@ async function fetchSkulKritters(ownerAddress) {
   return nfts;
 }
 
-function decodeABIString(hex) {
-  // ABI-encoded string: offset(32) + length(32) + data
-  if (!hex || hex === '0x') return '';
-  const raw = hex.startsWith('0x') ? hex.slice(2) : hex;
-  // offset is first 32 bytes, length is next 32 bytes
-  const offset = parseInt(raw.slice(0, 64), 16) * 2;
-  const length = parseInt(raw.slice(64, 128), 16);
-  const strHex = raw.slice(128, 128 + length * 2);
-  let str = '';
-  for (let i = 0; i < strHex.length; i += 2) {
-    str += String.fromCharCode(parseInt(strHex.slice(i, i+2), 16));
+// Fetch and parse metadata from any URI type
+async function fetchMetadata(uri) {
+  // data: URI — decode inline JSON
+  if (uri.startsWith('data:application/json;base64,')) {
+    return JSON.parse(atob(uri.split(',')[1]));
   }
-  return str;
+  if (uri.startsWith('data:application/json,')) {
+    return JSON.parse(decodeURIComponent(uri.split(',').slice(1).join(',')));
+  }
+  if (uri.startsWith('data:')) {
+    // Try to parse whatever is after the comma
+    try { return JSON.parse(atob(uri.split(',')[1])); } catch(_) {}
+    try { return JSON.parse(uri.split(',').slice(1).join(',')); } catch(_) {}
+    return null;
+  }
+
+  // Resolve IPFS to HTTP gateway — try multiple gateways on failure
+  const gateways = [
+    'https://ipfs.io/ipfs/',
+    'https://cloudflare-ipfs.com/ipfs/',
+    'https://gateway.pinata.cloud/ipfs/',
+    'https://nftstorage.link/ipfs/',
+  ];
+
+  let httpUrl = uri;
+  let cid = null;
+  if (uri.startsWith('ipfs://')) {
+    cid = uri.slice(7);
+    httpUrl = gateways[0] + cid;
+  } else if (uri.includes('/ipfs/')) {
+    // Already an HTTP IPFS URL — use as-is but also build CID fallback
+    const parts = uri.split('/ipfs/');
+    cid = parts[1];
+    httpUrl = uri;
+  }
+
+  // Try each gateway in order
+  const urls = cid
+    ? gateways.map(g => g + cid)
+    : [httpUrl];
+
+  for (const url of urls) {
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) continue;
+      const text = await r.text();
+      return JSON.parse(text);
+    } catch(e) {
+      console.warn('[Kritter] gateway failed:', url, e.message);
+      continue;
+    }
+  }
+  throw new Error('All gateways failed for: ' + uri);
+}
+
+// Correct ABI-encoded string decoder
+function decodeABIString(hex) {
+  if (!hex || hex === '0x' || hex.length < 4) return '';
+  const raw = hex.startsWith('0x') ? hex.slice(2) : hex;
+  if (raw.length < 128) return '';
+  try {
+    // The first 32 bytes are the offset pointer (usually 0x20 = 32)
+    const offsetBytes = parseInt(raw.slice(0, 64), 16); // in bytes
+    const offsetChars = offsetBytes * 2;               // in hex chars
+    // At the offset position, next 32 bytes = string length in bytes
+    const lengthStart = offsetChars;
+    const length = parseInt(raw.slice(lengthStart, lengthStart + 64), 16);
+    if (length === 0 || isNaN(length)) return '';
+    // String data starts after the length word
+    const dataStart = lengthStart + 64;
+    const strHex = raw.slice(dataStart, dataStart + length * 2);
+    let str = '';
+    for (let i = 0; i + 1 < strHex.length; i += 2) {
+      const code = parseInt(strHex.slice(i, i + 2), 16);
+      if (code > 0) str += String.fromCharCode(code);
+    }
+    return str;
+  } catch(e) {
+    console.warn('[Kritter] decodeABIString error:', e);
+    return '';
+  }
 }
 
 function resolveIpfs(url) {
   if (!url) return '';
   if (url.startsWith('ipfs://')) return 'https://ipfs.io/ipfs/' + url.slice(7);
+  // Some contracts return already-resolved URLs — pass through
   return url;
 }
 
