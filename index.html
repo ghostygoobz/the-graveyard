@@ -239,6 +239,12 @@
   .progress-bar { height: 3px; background: var(--surface2); border-radius: 99px; overflow: hidden; }
   .progress-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .4s; }
   .claim-btn { padding: 0.42rem 0.9rem; border-radius: 6px; border: none; cursor: pointer; font-family: var(--font-head); font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; transition: all .2s; white-space: nowrap; }
+  .cooldown-bar-wrap { margin-top: 0.5rem; }
+  .cooldown-label { font-size: 0.65rem; color: var(--muted); font-family: var(--font-mono); margin-bottom: 0.25rem; font-style: italic; }
+  .cooldown-bar { height: 3px; background: var(--surface2); border-radius: 99px; overflow: hidden; }
+  .cooldown-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, rgba(192,57,43,0.6), rgba(212,160,23,0.8)); transition: width 1s linear; }
+  .redo-btn { padding: 0.35rem 0.8rem; border-radius: 6px; border: 1px solid rgba(155,48,208,0.35); cursor: pointer; font-family: var(--font-head); font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; background: rgba(155,48,208,0.1); color: #c080e8; transition: all .2s; white-space: nowrap; }
+  .redo-btn:hover { background: rgba(155,48,208,0.25); }
 
   /* Link submission */
   .link-submit-area { margin-top: 0.7rem; display: flex; gap: 0.5rem; align-items: stretch; }
@@ -536,6 +542,18 @@
           <label>Link Instruction <span style="font-style:italic;font-weight:400;text-transform:none;letter-spacing:0">(shown to user)</span></label>
           <input type="text" id="qLinkLabel" placeholder="e.g. Paste your post URL here" />
         </div>
+        <div class="form-group" style="margin-bottom:0.6rem">
+          <label style="display:flex;align-items:center;gap:0.7rem;cursor:pointer;text-transform:none;letter-spacing:0;font-size:0.82rem;color:var(--bone)">
+            <input type="checkbox" id="qRepeatable" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)" />
+            <span>Repeatable <span style="color:var(--muted);font-style:italic;font-size:0.75rem">(user can redo this quest)</span></span>
+          </label>
+        </div>
+        <div id="qNoTimerWrap" style="display:none" class="form-group" style="margin-bottom:0.6rem">
+          <label style="display:flex;align-items:center;gap:0.7rem;cursor:pointer;text-transform:none;letter-spacing:0;font-size:0.82rem;color:var(--bone)">
+            <input type="checkbox" id="qNoTimer" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)" />
+            <span>No cooldown timer <span style="color:var(--muted);font-style:italic;font-size:0.75rem">(can be redone immediately)</span></span>
+          </label>
+        </div>
         <div style="display:flex;gap:.7rem">
           <button class="btn btn-primary" style="flex:1;padding:.7rem" onclick="saveQuest()">Save Quest</button>
           <button class="btn" style="flex:0;padding:.7rem 1rem;background:var(--surface2);color:var(--muted)" onclick="resetQuestForm()">Reset</button>
@@ -704,12 +722,12 @@ let state = {
   linkSubmissions: [], // {id, questId, walletAddr, url, status:'pending'|'approved'|'rejected', submittedAt}
   nextSubmissionId: 1,
   quests: [
-    { id:1, title:'First Stake', desc:'Stake your first NFT in the ecosystem.', icon:'🎯', type:'daily', xp:100, sklz:50, goal:1, progress:0, claimed:false },
-    { id:2, title:'Connect Wallet', desc:'Connect your EVM wallet to The Graveyard.', icon:'🔗', type:'daily', xp:50, sklz:20, goal:1, progress:0, claimed:false },
-    { id:3, title:'Stake 3 NFTs', desc:'Have at least 3 NFTs staked simultaneously.', icon:'🏆', type:'daily', xp:250, sklz:100, goal:3, progress:0, claimed:false },
-    { id:4, title:'Week Warrior', desc:'Keep at least 1 NFT staked for an entire week.', icon:'⚔️', type:'weekly', xp:500, sklz:300, goal:7, progress:2, claimed:false },
-    { id:5, title:'Quest Completionist', desc:'Complete 5 daily quests in one week.', icon:'📜', type:'weekly', xp:750, sklz:400, goal:5, progress:1, claimed:false },
-    { id:6, title:'Claim Rewards', desc:'Claim your SKLZ staking rewards at least once.', icon:'💰', type:'daily', xp:80, sklz:0, goal:1, progress:0, claimed:false },
+    { id:1, title:'First Stake', desc:'Stake your first NFT in the ecosystem.', icon:'🎯', type:'daily', xp:100, sklz:50, goal:1, progress:0, claimed:false, repeatable:false, noTimer:false, lastClaimed:null, claimCount:0 },
+    { id:2, title:'Connect Wallet', desc:'Connect your EVM wallet to The Graveyard.', icon:'🔗', type:'daily', xp:50, sklz:20, goal:1, progress:0, claimed:false, repeatable:false, noTimer:false, lastClaimed:null, claimCount:0 },
+    { id:3, title:'Stake 3 NFTs', desc:'Have at least 3 NFTs staked simultaneously.', icon:'🏆', type:'daily', xp:250, sklz:100, goal:3, progress:0, claimed:false, repeatable:false, noTimer:false, lastClaimed:null, claimCount:0 },
+    { id:4, title:'Week Warrior', desc:'Keep at least 1 NFT staked for an entire week.', icon:'⚔️', type:'weekly', xp:500, sklz:300, goal:7, progress:2, claimed:false, repeatable:false, noTimer:false, lastClaimed:null, claimCount:0 },
+    { id:5, title:'Quest Completionist', desc:'Complete 5 daily quests in one week.', icon:'📜', type:'weekly', xp:750, sklz:400, goal:5, progress:1, claimed:false, repeatable:false, noTimer:false, lastClaimed:null, claimCount:0 },
+    { id:6, title:'Claim Rewards', desc:'Claim your SKLZ staking rewards at least once.', icon:'💰', type:'daily', xp:80, sklz:0, goal:1, progress:0, claimed:false, repeatable:false, noTimer:false, lastClaimed:null, claimCount:0 },
   ],
   shopItems: [],
   leaderboard: [
@@ -1091,14 +1109,50 @@ function autoProgress(questId, val) {
 
 function claimQuest(id) {
   const q = state.quests.find(q => q.id === id);
-  if (!q || q.claimed || q.progress < q.goal) return;
-  q.claimed = true;
+  if (!q) return;
+  if (q.progress < q.goal) return;
+  if (!q.repeatable && q.claimed) return;
+  if (q.repeatable && isOnCooldown(q)) return;
+  // Grant rewards
   state.myXP += q.xp;
   state.questSKLZ += q.sklz;
   state.myQuestsDone++;
   toast('🎉 Quest complete! +' + q.xp + ' XP  +' + q.sklz + ' SKLZ');
   if (state.myQuestsDone >= 5) autoProgress(5, state.myQuestsDone);
+  if (q.repeatable) {
+    // Reset for next round
+    q.progress = 0;
+    q.lastClaimed = Date.now();
+    q.claimCount = (q.claimCount || 0) + 1;
+    q.linkStatus = null;
+    q.submittedLink = null;
+  } else {
+    q.claimed = true;
+  }
   updateStats(); renderQuests();
+}
+
+function isOnCooldown(q) {
+  if (!q.repeatable || !q.lastClaimed) return false;
+  if (q.noTimer) return false;
+  const cooldownMs = q.type === 'daily' ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+  return (Date.now() - q.lastClaimed) < cooldownMs;
+}
+
+function cooldownRemaining(q) {
+  if (!q.lastClaimed || q.noTimer) return 0;
+  const cooldownMs = q.type === 'daily' ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+  return Math.max(0, cooldownMs - (Date.now() - q.lastClaimed));
+}
+
+function formatTimeRemaining(ms) {
+  const totalSecs = Math.floor(ms / 1000);
+  const h = Math.floor(totalSecs / 3600);
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const s = totalSecs % 60;
+  if (h > 0) return h + 'h ' + m + 'm';
+  if (m > 0) return m + 'm ' + s + 's';
+  return s + 's';
 }
 
 function totalSKLZ() {
@@ -1217,13 +1271,19 @@ function renderQuests() {
     if (!list.length) { el.innerHTML = '<div class="empty"><div class="icon">📭</div>No quests yet</div>'; return; }
     el.innerHTML = list.map(q => {
       const pct = Math.min(100, Math.round((q.progress/q.goal)*100));
-      const ready = q.progress >= q.goal && !q.claimed;
+      const onCooldown  = isOnCooldown(q);
+      const msLeft      = cooldownRemaining(q);
+      const cooldownPct = q.lastClaimed && !q.noTimer
+        ? Math.min(100, Math.round(((Date.now() - q.lastClaimed) / (q.type==='daily'?86400000:604800000)) * 100))
+        : 100;
+      const fullyDone   = !q.repeatable && q.claimed;
+      const ready       = q.progress >= q.goal && !fullyDone && !onCooldown;
       const linkPending  = q.requiresLink && q.linkStatus === 'pending';
       const linkApproved = q.requiresLink && q.linkStatus === 'approved';
       const linkRejected = q.requiresLink && q.linkStatus === 'rejected';
       const waitingApproval = q.requiresLink && linkPending;
       // Link input area — show if quest requires link, not yet submitted or was rejected
-      const showLinkInput = q.requiresLink && !q.claimed && !linkPending && !linkApproved;
+      const showLinkInput = q.requiresLink && !fullyDone && !linkPending && !linkApproved && !onCooldown;
       const linkArea = q.requiresLink ? `
         <div style="margin-top:.7rem">
           ${showLinkInput ? `<div style="font-size:.72rem;color:var(--muted);margin-bottom:.4rem;font-style:italic">${q.linkLabel||'Paste your post URL here'}</div>
@@ -1242,18 +1302,33 @@ function renderQuests() {
       // Claim button: for link quests, only show after approval; don't show while pending
       const showClaim = !q.claimed && !waitingApproval;
       const claimReady = ready && (!q.requiresLink || linkApproved);
-      return `<div class="quest-card ${q.claimed?'completed':''}">
+      // Cooldown bar (only for repeatable quests with timer)
+      const cooldownBar = (q.repeatable && onCooldown) ? `
+        <div class="cooldown-bar-wrap">
+          <div class="cooldown-label">⏳ Resets in ${formatTimeRemaining(msLeft)}</div>
+          <div class="cooldown-bar"><div class="cooldown-fill" style="width:${cooldownPct}%"></div></div>
+        </div>` : '';
+      // Redo note for repeatable quests not on cooldown (and not waiting for link approval)
+      const redoNote = (q.repeatable && !onCooldown && !waitingApproval && (q.claimCount||0) > 0 && !q.noTimer) ? `
+        <div style="font-size:.68rem;color:var(--muted);font-style:italic;margin-top:.3rem">🔄 Completed ${q.claimCount}× — reset and ready again</div>` : '';
+      const noTimerNote = (q.repeatable && q.noTimer && !waitingApproval && (q.claimCount||0) > 0) ? `
+        <div style="font-size:.68rem;color:var(--muted);font-style:italic;margin-top:.3rem">🔄 Completed ${q.claimCount}× — no cooldown</div>` : '';
+      return `<div class="quest-card ${fullyDone?'completed':''} ${onCooldown?'on-cooldown':''}">
         <div class="quest-icon">${q.icon}</div>
         <div class="quest-body" style="flex:1">
-          <div class="quest-title">${q.title}${q.claimed?' ✅':''}</div>
+          <div class="quest-title">${q.title}${fullyDone?' ✅':''}${q.repeatable?' <span style="font-size:.6rem;color:#c080e8;font-family:var(--font-head);letter-spacing:.08em;background:rgba(155,48,208,.1);border:1px solid rgba(155,48,208,.25);border-radius:3px;padding:.1rem .4rem;text-transform:uppercase">Repeatable</span>':''}</div>
           <div class="quest-desc">${q.desc}</div>
           <div class="quest-meta">
             <span class="badge badge-${q.type}">${q.type.toUpperCase()}</span>
             <span class="badge badge-xp">+${q.xp} XP</span>
             ${q.sklz ? '<span class="badge" style="background:rgba(6,214,160,.1);color:var(--accent2);border:1px solid rgba(6,214,160,.25)">+'+q.sklz+' SKLZ</span>' : ''}
             ${q.requiresLink ? '<span class="badge" style="background:rgba(155,48,208,.1);color:#c080e8;border:1px solid rgba(155,48,208,.25)">🔗 Link Required</span>' : ''}
+            ${(!q.repeatable && q.type==='daily') ? '<span class="badge" style="background:rgba(192,57,43,.1);color:#e06060;border:1px solid rgba(192,57,43,.25)">⏱ 24h</span>' : ''}
           </div>
           ${linkArea}
+          ${cooldownBar}
+          ${redoNote}
+          ${noTimerNote}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.5rem;flex-shrink:0">
           <div class="quest-progress">
@@ -1261,6 +1336,7 @@ function renderQuests() {
             <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
           </div>
           ${showClaim ? '<button class="claim-btn '+(claimReady?'btn btn-success':'btn')+'" style="'+(claimReady?'':'background:var(--surface2);color:var(--muted);cursor:default')+'" onclick="claimQuest('+q.id+')" '+(claimReady?'':'disabled')+'>'+(claimReady?'Claim':'Pending')+'</button>' : ''}
+          ${(onCooldown && q.repeatable) ? '<div style="font-size:.62rem;color:var(--muted);font-style:italic;text-align:right">On cooldown</div>' : ''}
         </div>
       </div>`;
     }).join('');
@@ -1323,7 +1399,14 @@ function renderAdminQuests() {
   el.innerHTML = state.quests.map(q => `
     <div class="admin-quest-row">
       <span style="font-size:1.2rem">${q.icon}</span>
-      <div style="flex:1"><div class="aq-title">${q.title}</div><div class="aq-meta">${q.type==='daily'?'📅 Daily':'🗓 Weekly'} • ${q.xp} XP • ${q.sklz} SKLZ</div></div>
+      <div style="flex:1">
+        <div class="aq-title">${q.title}</div>
+        <div class="aq-meta">
+          ${q.type==='daily'?'📅 Daily':'🗓 Weekly'} • ${q.xp} XP • ${q.sklz} SKLZ
+          ${q.repeatable ? ' • <span style="color:#c080e8">🔄 Repeatable'+(q.noTimer?' (no timer)':' ('+q.type+' cooldown)')+'</span>' : ''}
+          ${q.requiresLink ? ' • <span style="color:var(--gold)">🔗 Link req.</span>' : ''}
+        </div>
+      </div>
       <button class="icon-btn edit" onclick="editQuest(${q.id})">✏️</button>
       <button class="icon-btn del" onclick="deleteQuest(${q.id})">🗑</button>
     </div>`).join('');
@@ -1339,13 +1422,15 @@ function saveQuest() {
   const goal         = parseInt(document.getElementById('qGoal').value) || 1;
   const requiresLink = document.getElementById('qRequiresLink').checked;
   const linkLabel    = document.getElementById('qLinkLabel').value.trim() || 'Paste your post URL here';
+  const repeatable   = document.getElementById('qRepeatable').checked;
+  const noTimer      = document.getElementById('qNoTimer').checked;
   if (!title || !desc) { toast('⚠️ Title and description required'); return; }
   if (state.editingQuestId) {
     const q = state.quests.find(q=>q.id===state.editingQuestId);
-    Object.assign(q, {title,desc,icon,type,xp,sklz,goal,requiresLink,linkLabel});
+    Object.assign(q, {title,desc,icon,type,xp,sklz,goal,requiresLink,linkLabel,repeatable,noTimer});
     toast('✅ Quest updated!');
   } else {
-    state.quests.push({id:state.nextQuestId++,title,desc,icon,type,xp,sklz,goal,requiresLink,linkLabel,progress:0,claimed:false,submittedLink:null,linkStatus:null});
+    state.quests.push({id:state.nextQuestId++,title,desc,icon,type,xp,sklz,goal,requiresLink,linkLabel,repeatable,noTimer,progress:0,claimed:false,submittedLink:null,linkStatus:null,lastClaimed:null,claimCount:0});
     toast('✅ Quest created!');
   }
   resetQuestForm(); renderAll();
@@ -1366,6 +1451,10 @@ function editQuest(id) {
   rl.checked = !!q.requiresLink;
   document.getElementById('qLinkLabelWrap').style.display = q.requiresLink ? 'block' : 'none';
   document.getElementById('qLinkLabel').value = q.linkLabel || '';
+  const rep = document.getElementById('qRepeatable');
+  rep.checked = !!q.repeatable;
+  document.getElementById('qNoTimerWrap').style.display = q.repeatable ? 'block' : 'none';
+  document.getElementById('qNoTimer').checked = !!q.noTimer;
   document.getElementById('questFormTitle').textContent = 'Edit Quest';
 }
 
@@ -1380,6 +1469,9 @@ function resetQuestForm() {
   document.getElementById('qType').value = 'daily';
   document.getElementById('qRequiresLink').checked = false;
   document.getElementById('qLinkLabelWrap').style.display = 'none';
+  document.getElementById('qRepeatable').checked = false;
+  document.getElementById('qNoTimer').checked = false;
+  document.getElementById('qNoTimerWrap').style.display = 'none';
   document.getElementById('questFormTitle').textContent = 'Create New Quest';
 }
 
@@ -1585,6 +1677,18 @@ document.getElementById('codeModal').addEventListener('click', function(e) { if 
 document.getElementById('qRequiresLink').addEventListener('change', function() {
   document.getElementById('qLinkLabelWrap').style.display = this.checked ? 'block' : 'none';
 });
+
+// Toggle no-timer option when repeatable is checked
+document.getElementById('qRepeatable').addEventListener('change', function() {
+  document.getElementById('qNoTimerWrap').style.display = this.checked ? 'block' : 'none';
+  if (!this.checked) document.getElementById('qNoTimer').checked = false;
+});
+
+// Live cooldown ticker — re-renders quests every second if any are on cooldown
+setInterval(function() {
+  const anyOnCooldown = state.quests.some(q => q.repeatable && isOnCooldown(q));
+  if (anyOnCooldown) renderQuests();
+}, 1000);
 
 renderAll();
 
