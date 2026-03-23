@@ -401,6 +401,38 @@
   .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); margin: 2rem 0; }
 
   /* ── SCROLLBAR ── */
+  /* ── PROFILE ── */
+  .profile-nav-btn { display:flex;align-items:center;gap:.5rem;background:rgba(155,48,208,0.08);border:1px solid rgba(155,48,208,0.25);border-radius:8px;padding:.35rem .7rem .35rem .35rem;cursor:pointer;transition:all .2s; }
+  .profile-nav-btn:hover { background:rgba(155,48,208,0.18); }
+  .profile-nav-avatar { width:28px;height:28px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1rem;background:rgba(155,48,208,0.15);border:1px solid rgba(155,48,208,0.3);flex-shrink:0; }
+  .profile-nav-avatar img { width:100%;height:100%;object-fit:cover; }
+
+  .profile-hero { display:flex;align-items:flex-start;gap:2rem;margin-bottom:2.5rem;padding:2rem;background:linear-gradient(135deg,rgba(74,16,96,0.2),rgba(20,8,30,0.4));border:1px solid rgba(155,48,208,0.2);border-radius:16px;flex-wrap:wrap;position:relative;overflow:hidden; }
+  .profile-hero::before { content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(155,48,208,0.6),transparent); }
+  .profile-avatar-wrap { position:relative;flex-shrink:0; }
+  .profile-avatar { width:100px;height:100px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:3rem;background:rgba(155,48,208,0.12);border:2px solid rgba(155,48,208,0.4);cursor:pointer;transition:all .25s; }
+  .profile-avatar:hover { border-color:rgba(155,48,208,0.8);box-shadow:0 0 20px rgba(155,48,208,0.3); }
+  .profile-avatar img { width:100%;height:100%;object-fit:cover; }
+  .profile-avatar-hint { position:absolute;bottom:4px;right:4px;background:rgba(155,48,208,0.9);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:.7rem;pointer-events:none; }
+  .profile-info { flex:1;min-width:200px; }
+  .profile-username-wrap { display:flex;align-items:center;gap:.8rem;margin-bottom:.5rem;flex-wrap:wrap; }
+  .profile-username { font-family:var(--font-head);font-size:1.4rem;font-weight:700;letter-spacing:.06em;color:var(--bone); }
+  .profile-username-placeholder { font-family:var(--font-head);font-size:1.1rem;color:var(--muted);font-style:italic; }
+  .edit-username-btn { padding:.3rem .8rem;border-radius:6px;border:1px solid rgba(155,48,208,0.3);background:rgba(155,48,208,0.08);color:#c080e8;font-family:var(--font-head);font-size:.64rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all .2s; }
+  .edit-username-btn:hover { background:rgba(155,48,208,0.2); }
+  .profile-addr { font-family:var(--font-mono);font-size:.72rem;color:var(--muted);margin-bottom:1rem; }
+  .profile-stats-row { display:flex;gap:1.2rem;flex-wrap:wrap; }
+  .profile-stat { text-align:center; }
+  .profile-stat .pval { font-family:var(--font-mono);font-size:1.1rem;font-weight:700;color:#c080e8; }
+  .profile-stat .plbl { font-family:var(--font-head);font-size:.58rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-top:.1rem; }
+
+  .username-edit-wrap { display:none;align-items:center;gap:.6rem;margin-bottom:.5rem; }
+  .username-edit-wrap input { padding:.5rem .8rem;border-radius:8px;background:rgba(0,0,0,0.4);border:1px solid rgba(155,48,208,0.35);color:var(--text);font-family:var(--font-head);font-size:.9rem;outline:none;width:220px;transition:border-color .2s; }
+  .username-edit-wrap input:focus { border-color:var(--accent);box-shadow:0 0 10px rgba(155,48,208,0.2); }
+  .save-username-btn { padding:.5rem 1rem;border-radius:7px;border:none;cursor:pointer;background:linear-gradient(135deg,#7a22aa,#9b30d0);color:#fff;font-family:var(--font-head);font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;transition:all .2s; }
+  .save-username-btn:hover { box-shadow:0 0 14px rgba(155,48,208,0.4); }
+  .cancel-username-btn { padding:.5rem .8rem;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:var(--font-head);font-size:.68rem;cursor:pointer;transition:all .2s; }
+
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
   ::-webkit-scrollbar-thumb { background: rgba(155,48,208,0.25); border-radius: 3px; }
@@ -444,7 +476,13 @@
     <button class="nav-tab emporium-tab" onclick="showPage('emporium',event)">Emporium</button>
     <button class="nav-tab admin-tab" id="adminNavBtn" onclick="requestAdminAccess(event)">⚙ Admin</button>
   </div>
-  <button class="connect-btn" id="connectBtn" onclick="openWalletModal()">Connect Wallet</button>
+  <div style="display:flex;align-items:center;gap:.8rem">
+    <button class="profile-nav-btn" id="profileNavBtn" onclick="showPage('profile',event)" style="display:none">
+      <div class="profile-nav-avatar" id="profileNavAvatar">👤</div>
+      <span id="profileNavName" style="font-family:var(--font-head);font-size:.72rem;letter-spacing:.05em;color:var(--bone);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Profile</span>
+    </button>
+    <button class="connect-btn" id="connectBtn" onclick="openWalletModal()">Connect Wallet</button>
+  </div>
 </nav>
 
 <main>
@@ -711,6 +749,7 @@ const ADMIN_PASSWORD = 'graveyard2024';
 // ══════ STATE ══════
 let state = {
   connected: false, wallet: null, address: null,
+  profile: { username: '', avatarB64: '' },
   pendingRewards: 0, totalEarned: 0, myXP: 0, myQuestsDone: 0, questSKLZ: 0,
   editingQuestId: null, editingShopId: null,
   adminUnlocked: false,
@@ -797,195 +836,83 @@ function closeWalletModal() { document.getElementById('walletModal').classList.r
 
 // ══════ SKUL KRITTERS — ApeChain config ══════
 const COLLECTION_ADDRESS = '0x8817b9c17d5c84b21dEC1E1a9E0de606716807B1';
-const APECHAIN_RPC       = 'https://rpc.apechain.com/http';
 const APECHAIN_CHAIN_ID  = '0x8173'; // 33139 decimal
-// SimpleHash ApeChain slug (no API key needed for public reads)
-const SIMPLEHASH_BASE    = 'https://api.simplehash.com/api/v0/nfts/owners_v2';
+const APECHAIN_RPC       = 'https://rpc.apechain.com/http';
 
-// ERC-721 balanceOf & tokenOfOwnerByIndex ABI fragments
-const ERC721_ABI_FRAGMENTS = [
-  '0x70a08231', // balanceOf(address)
-  '0x2f745c59', // tokenOfOwnerByIndex(address,uint256)
-  '0x06fdde03', // name()
-  '0xc87b56dd', // tokenURI(uint256)
-];
-
-function encodeCall(sig4, ...params) {
-  // Encode a simple eth_call payload
-  let data = sig4;
-  for (const p of params) {
-    const hex = p.toString(16).padStart(64, '0');
-    data += hex;
-  }
-  return data;
-}
-
-function padAddress(addr) {
-  return addr.replace('0x','').padStart(64,'0');
-}
-
+// ── NFT fetching — uses ApeChain RPC to get token IDs owned by wallet ──
+// Images show as a placeholder skull; full artwork can be wired in later
 async function rpcCall(method, params) {
   const res = await fetch(APECHAIN_RPC, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc:'2.0', id:1, method, params })
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
   });
   const json = await res.json();
   if (json.error) throw new Error(json.error.message);
   return json.result;
 }
 
+function padAddress(addr) {
+  return addr.replace('0x', '').toLowerCase().padStart(64, '0');
+}
+
 async function fetchSkulKritters(ownerAddress) {
-  // Step 1: get balance
+  // balanceOf(address)
   const balHex = await rpcCall('eth_call', [{
     to: COLLECTION_ADDRESS,
     data: '0x70a08231' + padAddress(ownerAddress)
   }, 'latest']);
+
   const balance = parseInt(balHex, 16);
-  if (balance === 0) return [];
+  console.log('[Kritter] balance:', balance);
+  if (!balance || isNaN(balance)) return [];
 
-  // Step 2: fetch each tokenId via tokenOfOwnerByIndex
-  const tokenIds = [];
-  for (let i = 0; i < balance; i++) {
-    const tidHex = await rpcCall('eth_call', [{
-      to: COLLECTION_ADDRESS,
-      data: '0x2f745c59' + padAddress(ownerAddress) + i.toString(16).padStart(64,'0')
-    }, 'latest']);
-    tokenIds.push(parseInt(tidHex, 16));
-  }
-
-  // Step 3: fetch tokenURI for each token
-  const nfts = [];
-  const BATCH = 6;
-  for (let b = 0; b < tokenIds.length; b += BATCH) {
-    const batch = tokenIds.slice(b, b + BATCH);
-    const uriResults = await Promise.all(batch.map(async tid => {
-      try {
-        const uriHex = await rpcCall('eth_call', [{
-          to: COLLECTION_ADDRESS,
-          data: '0xc87b56dd' + tid.toString(16).padStart(64,'0')
-        }, 'latest']);
-        const uri = decodeABIString(uriHex);
-        console.log('[Kritter] tokenId', tid, 'raw URI:', uri);
-        return { tid, uri };
-      } catch(e) {
-        console.warn('[Kritter] tokenURI call failed for', tid, e);
-        return { tid, uri: null };
-      }
-    }));
-
-    for (const { tid, uri } of uriResults) {
-      let meta = null;
-      if (uri) {
-        try {
-          meta = await fetchMetadata(uri);
-          console.log('[Kritter] metadata for', tid, meta);
-        } catch(e) {
-          console.warn('[Kritter] metadata fetch failed for', tid, e);
-        }
-      }
-      const existing = state.nfts.find(n => n.tokenId === tid);
-      nfts.push({
-        tokenId: tid,
-        id: '#' + String(tid).padStart(4,'0'),
-        name: (meta && meta.name) ? meta.name : 'Skul Kritter #' + tid,
-        image: (meta && meta.image) ? resolveIpfs(meta.image) : '',
-        bg: '#120810',
-        staked: existing ? existing.staked : false,
-      });
-    }
-  }
-  return nfts;
-}
-
-// Fetch and parse metadata from any URI type
-async function fetchMetadata(uri) {
-  // data: URI — decode inline JSON
-  if (uri.startsWith('data:application/json;base64,')) {
-    return JSON.parse(atob(uri.split(',')[1]));
-  }
-  if (uri.startsWith('data:application/json,')) {
-    return JSON.parse(decodeURIComponent(uri.split(',').slice(1).join(',')));
-  }
-  if (uri.startsWith('data:')) {
-    // Try to parse whatever is after the comma
-    try { return JSON.parse(atob(uri.split(',')[1])); } catch(_) {}
-    try { return JSON.parse(uri.split(',').slice(1).join(',')); } catch(_) {}
-    return null;
-  }
-
-  // Resolve IPFS to HTTP gateway — try multiple gateways on failure
-  const gateways = [
-    'https://ipfs.io/ipfs/',
-    'https://cloudflare-ipfs.com/ipfs/',
-    'https://gateway.pinata.cloud/ipfs/',
-    'https://nftstorage.link/ipfs/',
-  ];
-
-  let httpUrl = uri;
-  let cid = null;
-  if (uri.startsWith('ipfs://')) {
-    cid = uri.slice(7);
-    httpUrl = gateways[0] + cid;
-  } else if (uri.includes('/ipfs/')) {
-    // Already an HTTP IPFS URL — use as-is but also build CID fallback
-    const parts = uri.split('/ipfs/');
-    cid = parts[1];
-    httpUrl = uri;
-  }
-
-  // Try each gateway in order
-  const urls = cid
-    ? gateways.map(g => g + cid)
-    : [httpUrl];
-
-  for (const url of urls) {
-    try {
-      const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
-      if (!r.ok) continue;
-      const text = await r.text();
-      return JSON.parse(text);
-    } catch(e) {
-      console.warn('[Kritter] gateway failed:', url, e.message);
-      continue;
-    }
-  }
-  throw new Error('All gateways failed for: ' + uri);
-}
-
-// Correct ABI-encoded string decoder
-function decodeABIString(hex) {
-  if (!hex || hex === '0x' || hex.length < 4) return '';
-  const raw = hex.startsWith('0x') ? hex.slice(2) : hex;
-  if (raw.length < 128) return '';
+  // tokensOfOwner(address) — ERC721A batch function (selector: 0x8462151c)
+  // Falls back to looping tokenOfOwnerByIndex if needed
+  let tokenIds = [];
   try {
-    // The first 32 bytes are the offset pointer (usually 0x20 = 32)
-    const offsetBytes = parseInt(raw.slice(0, 64), 16); // in bytes
-    const offsetChars = offsetBytes * 2;               // in hex chars
-    // At the offset position, next 32 bytes = string length in bytes
-    const lengthStart = offsetChars;
-    const length = parseInt(raw.slice(lengthStart, lengthStart + 64), 16);
-    if (length === 0 || isNaN(length)) return '';
-    // String data starts after the length word
-    const dataStart = lengthStart + 64;
-    const strHex = raw.slice(dataStart, dataStart + length * 2);
-    let str = '';
-    for (let i = 0; i + 1 < strHex.length; i += 2) {
-      const code = parseInt(strHex.slice(i, i + 2), 16);
-      if (code > 0) str += String.fromCharCode(code);
-    }
-    return str;
+    const result = await rpcCall('eth_call', [{
+      to: COLLECTION_ADDRESS,
+      data: '0x8462151c' + padAddress(ownerAddress)
+    }, 'latest']);
+    tokenIds = decodeUint256Array(result);
+    console.log('[Kritter] tokensOfOwner result:', tokenIds);
   } catch(e) {
-    console.warn('[Kritter] decodeABIString error:', e);
-    return '';
+    console.warn('[Kritter] tokensOfOwner failed, falling back to index loop:', e.message);
+    for (let i = 0; i < balance; i++) {
+      const tidHex = await rpcCall('eth_call', [{
+        to: COLLECTION_ADDRESS,
+        data: '0x2f745c59' + padAddress(ownerAddress) + i.toString(16).padStart(64, '0')
+      }, 'latest']);
+      tokenIds.push(parseInt(tidHex, 16));
+    }
   }
+
+  return tokenIds.map(tid => {
+    const existing = state.nfts.find(n => n.tokenId === tid);
+    return {
+      tokenId: tid,
+      id: '#' + String(tid).padStart(4, '0'),
+      name: 'Skul Kritter #' + tid,
+      image: '',          // placeholder skull shown in card
+      bg: '#120810',
+      staked: existing ? existing.staked : false,
+    };
+  });
 }
 
-function resolveIpfs(url) {
-  if (!url) return '';
-  if (url.startsWith('ipfs://')) return 'https://ipfs.io/ipfs/' + url.slice(7);
-  // Some contracts return already-resolved URLs — pass through
-  return url;
+// Decode an ABI-encoded uint256[] array returned by tokensOfOwner
+function decodeUint256Array(hex) {
+  if (!hex || hex === '0x') return [];
+  const raw = hex.startsWith('0x') ? hex.slice(2) : hex;
+  // offset (32 bytes) → length (32 bytes) → data
+  const length = parseInt(raw.slice(64, 128), 16);
+  const ids = [];
+  for (let i = 0; i < length; i++) {
+    const start = 128 + i * 64;
+    ids.push(parseInt(raw.slice(start, start + 64), 16));
+  }
+  return ids;
 }
 
 function setNFTLoadState(loading, msg) {
@@ -1065,6 +992,7 @@ async function connectWallet(name) {
     document.getElementById('connectBtn').textContent = shortAddr;
     document.getElementById('connectBtn').classList.add('connected');
     document.getElementById('adminNavBtn').classList.add('visible');
+    document.getElementById('profileNavBtn').style.display = 'flex';
     toast('☠ Connected — fetching your Kritters…');
     startRewardAccumulation();
     renderNFTs();
@@ -1077,6 +1005,7 @@ async function connectWallet(name) {
         state.nfts = [];
         document.getElementById('connectBtn').textContent = 'Connect Wallet';
         document.getElementById('connectBtn').classList.remove('connected');
+        document.getElementById('profileNavBtn').style.display = 'none';
         renderAll();
         toast('👻 Wallet disconnected');
       } else {
@@ -1413,13 +1342,19 @@ function renderLeaderboard() {
   if (state.connected && state.myXP > 0) all.push({addr: state.address||'0xYou', emoji:'😎', name:'You', xp:state.myXP, quests:state.myQuestsDone, isMe:true});
   all.sort((a,b) => b.xp - a.xp);
   const medals = {0:'🥇',1:'🥈',2:'🥉'};
-  document.getElementById('leaderboard').innerHTML = all.map((p,i) => `
-    <div class="lb-row ${p.isMe?'me':''}">
-      <div class="lb-rank ${i===0?'top1':i===1?'top2':i===2?'top3':''}">${medals[i]||(i+1)}</div>
-      <div class="lb-avatar">${p.emoji}</div>
-      <div style="flex:1"><div class="lb-name">${p.name}${p.isMe?' (you)':''}</div><div class="lb-addr">${p.addr}</div></div>
-      <div style="text-align:right"><div class="lb-xp">${p.xp.toLocaleString()} XP</div><div class="lb-quests">${p.quests} quests</div></div>
-    </div>`).join('');
+  document.getElementById('leaderboard').innerHTML = all.map((p,i) => {
+    // For the current user, use their profile name/avatar if set
+    const displayName = p.isMe && state.profile.username ? state.profile.username : (p.name || p.addr);
+    const avatarContent = p.isMe && state.profile.avatarB64
+      ? '<img src="'+state.profile.avatarB64+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />'
+      : (p.emoji || '💀');
+    return '<div class="lb-row '+(p.isMe?'me':'')+'">'+
+      '<div class="lb-rank '+(i===0?'top1':i===1?'top2':i===2?'top3':'')+'">'+(medals[i]||(i+1))+'</div>'+
+      '<div class="lb-avatar">'+avatarContent+'</div>'+
+      '<div style="flex:1"><div class="lb-name">'+displayName+(p.isMe?' (you)':'')+'</div><div class="lb-addr">'+p.addr+'</div></div>'+
+      '<div style="text-align:right"><div class="lb-xp">'+p.xp.toLocaleString()+' XP</div><div class="lb-quests">'+p.quests+' quests</div></div>'+
+    '</div>';
+  }).join('');
 }
 
 // ══════ RENDER SHOP ══════
@@ -1726,10 +1661,116 @@ function reviewLink(submissionId, decision) {
   renderQuests();
 }
 
+// ══════ PROFILE ══════
+function renderProfile() {
+  if (!state.connected) return;
+
+  // Avatar
+  const emojiEl = document.getElementById('profileAvatarEmoji');
+  const imgEl   = document.getElementById('profileAvatarImg');
+  const navAvatar = document.getElementById('profileNavAvatar');
+  if (state.profile.avatarB64) {
+    imgEl.src = state.profile.avatarB64;
+    imgEl.style.display = 'block';
+    emojiEl.style.display = 'none';
+    // nav avatar
+    navAvatar.innerHTML = '<img src="'+state.profile.avatarB64+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />';
+  } else {
+    imgEl.style.display = 'none';
+    emojiEl.style.display = '';
+    navAvatar.innerHTML = '👤';
+  }
+
+  // Username
+  const nameDisplay = document.getElementById('profileUsernameDisplay');
+  const namePlaceholder = document.getElementById('profileUsernamePlaceholder');
+  const navName = document.getElementById('profileNavName');
+  if (state.profile.username) {
+    nameDisplay.textContent = state.profile.username;
+    nameDisplay.style.display = '';
+    namePlaceholder.style.display = 'none';
+    navName.textContent = state.profile.username;
+  } else {
+    nameDisplay.style.display = 'none';
+    namePlaceholder.style.display = '';
+    navName.textContent = 'Profile';
+  }
+
+  // Address
+  document.getElementById('profileAddrDisplay').textContent = state.address || '';
+
+  // Stats
+  document.getElementById('profileXP').textContent = state.myXP.toLocaleString();
+  document.getElementById('profileQuests').textContent = state.myQuestsDone;
+  document.getElementById('profileSKLZ').textContent = Math.floor(totalSKLZ()).toLocaleString();
+  document.getElementById('profileStaked').textContent = state.nfts.filter(n=>n.staked).length;
+
+  // Staked NFT mini-grid
+  const staked = state.nfts.filter(n=>n.staked);
+  const grid = document.getElementById('profileNftGrid');
+  if (!staked.length) {
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="icon">💀</div><div style="font-style:italic;font-size:.85rem">No Kritters staked yet</div></div>';
+  } else {
+    grid.innerHTML = staked.map(nft => {
+      const imgContent = nft.image
+        ? '<img src="'+nft.image+'" alt="'+nft.name+'" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display='none';this.nextSibling.style.display='flex'" /><div style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-size:3rem;background:var(--surface2)">💀</div>'
+        : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:3rem;background:var(--surface2)">💀</div>';
+      return '<div class="nft-card staked" style="cursor:default"><div class="nft-thumb" style="background:'+nft.bg+'">'+imgContent+'</div><div class="nft-info"><div class="nft-name">'+nft.name+'</div><div class="nft-id">'+nft.id+'</div><div class="staked-badge">🦴 STAKED</div></div></div>';
+    }).join('');
+  }
+}
+
+function triggerAvatarUpload() {
+  document.getElementById('avatarFileInput').click();
+}
+
+function handleAvatarUpload(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  if (file.size > 2 * 1024 * 1024) { toast('⚠ Image must be under 2MB'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    state.profile.avatarB64 = e.target.result;
+    renderProfile();
+    updateLeaderboard();
+    toast('✅ Profile picture updated!');
+  };
+  reader.readAsDataURL(file);
+}
+
+function startEditUsername() {
+  document.getElementById('usernameDisplayWrap').style.display = 'none';
+  const wrap = document.getElementById('usernameEditWrap');
+  wrap.style.display = 'flex';
+  const input = document.getElementById('usernameInput');
+  input.value = state.profile.username;
+  input.focus();
+}
+
+function cancelEditUsername() {
+  document.getElementById('usernameEditWrap').style.display = 'none';
+  document.getElementById('usernameDisplayWrap').style.display = 'flex';
+}
+
+function saveUsername() {
+  const val = document.getElementById('usernameInput').value.trim();
+  if (!val) { toast('⚠ Username cannot be empty'); return; }
+  if (val.length < 3) { toast('⚠ Username must be at least 3 characters'); return; }
+  state.profile.username = val;
+  cancelEditUsername();
+  renderProfile();
+  renderLeaderboard(); // update leaderboard with new name
+  toast('✅ Username saved!');
+}
+
+function updateLeaderboard() {
+  renderLeaderboard();
+}
+
 // ══════ RENDER ALL ══════
 function renderAll() {
   renderNFTs(); renderQuests(); renderLeaderboard(); renderShop();
-  renderAdminQuests(); renderAdminShop(); renderLinkReview(); updateStats();
+  renderAdminQuests(); renderAdminShop(); renderLinkReview(); updateStats(); renderProfile();
 }
 
 document.getElementById('walletModal').addEventListener('click', function(e) { if (e.target===this) closeWalletModal(); });
