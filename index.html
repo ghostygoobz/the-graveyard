@@ -1064,7 +1064,8 @@ async function connectWallet(name) {
     document.getElementById('connectBtn').textContent = shortAddr;
     document.getElementById('connectBtn').classList.add('connected');
     document.getElementById('adminNavBtn').classList.add('visible');
-    document.getElementById('profileNavBtn').style.display = 'flex';
+    const _pnb = document.getElementById('profileNavBtn');
+    if (_pnb) _pnb.style.display = 'flex';
     toast('☠ Connected — fetching your Kritters…');
     startRewardAccumulation();
     renderNFTs();
@@ -1110,7 +1111,7 @@ async function connectWallet(name) {
         state.nfts = [];
         document.getElementById('connectBtn').textContent = 'Connect Wallet';
         document.getElementById('connectBtn').classList.remove('connected');
-        document.getElementById('profileNavBtn').style.display = 'none';
+        const _pnb2 = document.getElementById('profileNavBtn'); if (_pnb2) _pnb2.style.display = 'none';
         renderAll();
         toast('👻 Wallet disconnected');
       } else {
@@ -1124,10 +1125,12 @@ async function connectWallet(name) {
     });
 
   } catch (err) {
+    console.error('[connectWallet] Full error:', err);
+    console.error('[connectWallet] Stack:', err.stack);
     if (err.code === 4001) {
       toast('❌ Connection rejected by user.');
     } else {
-      toast('⚠ Connection failed: ' + (err.message || 'unknown error'));
+      toast('⚠ Connection failed: ' + (err.message || 'unknown error') + ' (see console for details)');
     }
   }
 }
@@ -1773,6 +1776,7 @@ function reviewLink(submissionId, decision) {
 // ══════ PROFILE ══════
 function renderProfile() {
   if (!state.connected) return;
+  try {
 
   // Avatar
   const emojiEl = document.getElementById('profileAvatarEmoji');
@@ -1817,16 +1821,19 @@ function renderProfile() {
   // Staked NFT mini-grid
   const staked = state.nfts.filter(n=>n.staked);
   const grid = document.getElementById('profileNftGrid');
-  if (!staked.length) {
-    grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="icon">💀</div><div style="font-style:italic;font-size:.85rem">No Kritters staked yet</div></div>';
-  } else {
-    grid.innerHTML = staked.map(nft => {
-      const imgContent = nft.image
-        ? '<img src="'+nft.image+'" alt="'+nft.name+'" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'" /><div style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-size:3rem;background:var(--surface2)">💀</div>'
-        : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:3rem;background:var(--surface2)">💀</div>';
-      return '<div class="nft-card staked" style="cursor:default"><div class="nft-thumb" style="background:'+nft.bg+'">'+imgContent+'</div><div class="nft-info"><div class="nft-name">'+nft.name+'</div><div class="nft-id">'+nft.id+'</div><div class="staked-badge">🦴 STAKED</div></div></div>';
-    }).join('');
+  if (grid) {
+    if (!staked.length) {
+      grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="icon">💀</div><div style="font-style:italic;font-size:.85rem">No Kritters staked yet</div></div>';
+    } else {
+      grid.innerHTML = staked.map(nft => {
+        const imgContent = nft.image
+          ? '<img src="'+nft.image+'" alt="'+nft.name+'" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'" /><div style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-size:3rem;background:var(--surface2)">💀</div>'
+          : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:3rem;background:var(--surface2)">💀</div>';
+        return '<div class="nft-card staked" style="cursor:default"><div class="nft-thumb" style="background:'+nft.bg+'">'+imgContent+'</div><div class="nft-info"><div class="nft-name">'+nft.name+'</div><div class="nft-id">'+nft.id+'</div><div class="staked-badge">🦴 STAKED</div></div></div>';
+      }).join('');
+    }
   }
+  } catch(e) { console.error('[renderProfile] error:', e); }
 }
 
 function triggerAvatarUpload() {
@@ -1880,8 +1887,15 @@ function updateLeaderboard() {
 
 // ══════ RENDER ALL ══════
 function renderAll() {
-  renderNFTs(); renderQuests(); renderLeaderboard(); renderShop();
-  renderAdminQuests(); renderAdminShop(); renderLinkReview(); updateStats(); renderProfile();
+  try { renderNFTs(); } catch(e) { console.error('[renderNFTs]', e); }
+  try { renderQuests(); } catch(e) { console.error('[renderQuests]', e); }
+  try { renderLeaderboard(); } catch(e) { console.error('[renderLeaderboard]', e); }
+  try { renderShop(); } catch(e) { console.error('[renderShop]', e); }
+  try { renderAdminQuests(); } catch(e) { console.error('[renderAdminQuests]', e); }
+  try { renderAdminShop(); } catch(e) { console.error('[renderAdminShop]', e); }
+  try { renderLinkReview(); } catch(e) { console.error('[renderLinkReview]', e); }
+  try { updateStats(); } catch(e) { console.error('[updateStats]', e); }
+  try { renderProfile(); } catch(e) { console.error('[renderProfile]', e); }
 }
 
 document.getElementById('walletModal').addEventListener('click', function(e) { if (e.target===this) closeWalletModal(); });
