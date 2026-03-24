@@ -1,9 +1,9 @@
 // api/progress-load.js
-import { Redis } from '@upstash/redis';
+const { Redis } = require('@upstash/redis');
 
 const redis = Redis.fromEnv();
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
 
   const { wallet } = req.query;
@@ -14,4 +14,4 @@ export default async function handler(req, res) {
 
   res.setHeader('Cache-Control', 'no-store');
   res.status(200).json(record || null);
-}
+};
