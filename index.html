@@ -1778,45 +1778,55 @@ function renderProfile() {
   if (!state.connected) return;
   try {
 
-  // Avatar
-  const emojiEl = document.getElementById('profileAvatarEmoji');
-  const imgEl   = document.getElementById('profileAvatarImg');
+  // ── Nav bar avatar + name (always present in DOM) ──
   const navAvatar = document.getElementById('profileNavAvatar');
-  if (state.profile.avatarB64) {
-    imgEl.src = state.profile.avatarB64;
-    imgEl.style.display = 'block';
-    emojiEl.style.display = 'none';
-    // nav avatar
-    navAvatar.innerHTML = '<img src="'+state.profile.avatarB64+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />';
-  } else {
-    imgEl.style.display = 'none';
-    emojiEl.style.display = '';
-    navAvatar.innerHTML = '👤';
+  const navName   = document.getElementById('profileNavName');
+  if (navAvatar) {
+    navAvatar.innerHTML = state.profile.avatarB64
+      ? '<img src="'+state.profile.avatarB64+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />'
+      : '👤';
+  }
+  if (navName) {
+    navName.textContent = state.profile.username || 'Profile';
   }
 
-  // Username
-  const nameDisplay = document.getElementById('profileUsernameDisplay');
+  // ── Profile page elements (only exist when profile page is in the DOM) ──
+  const emojiEl       = document.getElementById('profileAvatarEmoji');
+  const imgEl         = document.getElementById('profileAvatarImg');
+  const nameDisplay   = document.getElementById('profileUsernameDisplay');
   const namePlaceholder = document.getElementById('profileUsernamePlaceholder');
-  const navName = document.getElementById('profileNavName');
-  if (state.profile.username) {
-    nameDisplay.textContent = state.profile.username;
-    nameDisplay.style.display = '';
-    namePlaceholder.style.display = 'none';
-    navName.textContent = state.profile.username;
-  } else {
-    nameDisplay.style.display = 'none';
-    namePlaceholder.style.display = '';
-    navName.textContent = 'Profile';
+  const addrDisplay   = document.getElementById('profileAddrDisplay');
+  const profileXP     = document.getElementById('profileXP');
+  const profileQuests = document.getElementById('profileQuests');
+  const profileSKLZ   = document.getElementById('profileSKLZ');
+  const profileStaked = document.getElementById('profileStaked');
+
+  // Only update profile page elements if they exist
+  if (imgEl && emojiEl) {
+    if (state.profile.avatarB64) {
+      imgEl.src = state.profile.avatarB64;
+      imgEl.style.display = 'block';
+      emojiEl.style.display = 'none';
+    } else {
+      imgEl.style.display = 'none';
+      emojiEl.style.display = '';
+    }
   }
-
-  // Address
-  document.getElementById('profileAddrDisplay').textContent = state.address || '';
-
-  // Stats
-  document.getElementById('profileXP').textContent = state.myXP.toLocaleString();
-  document.getElementById('profileQuests').textContent = state.myQuestsDone;
-  document.getElementById('profileSKLZ').textContent = Math.floor(totalSKLZ()).toLocaleString();
-  document.getElementById('profileStaked').textContent = state.nfts.filter(n=>n.staked).length;
+  if (nameDisplay && namePlaceholder) {
+    if (state.profile.username) {
+      nameDisplay.textContent = state.profile.username;
+      nameDisplay.style.display = '';
+      namePlaceholder.style.display = 'none';
+    } else {
+      nameDisplay.style.display = 'none';
+      namePlaceholder.style.display = '';
+    }
+  }
+  if (addrDisplay)   addrDisplay.textContent   = state.address || '';
+  if (profileXP)     profileXP.textContent     = state.myXP.toLocaleString();
+  if (profileQuests) profileQuests.textContent = state.myQuestsDone;
+  if (profileSKLZ)   profileSKLZ.textContent   = Math.floor(totalSKLZ()).toLocaleString();
+  if (profileStaked) profileStaked.textContent = state.nfts.filter(n=>n.staked).length;
 
   // Staked NFT mini-grid
   const staked = state.nfts.filter(n=>n.staked);
