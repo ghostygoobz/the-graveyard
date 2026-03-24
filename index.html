@@ -834,6 +834,77 @@ function performShowPage(name, e) {
 function openWalletModal() { document.getElementById('walletModal').classList.add('open'); }
 function closeWalletModal() { document.getElementById('walletModal').classList.remove('open'); }
 
+// ══════ PERSISTENCE — save/load via Vercel KV API ══════
+
+// Debounce timer so rapid changes (reward ticks, etc.) don't spam the API
+let _saveTimer = null;
+function scheduleSave() {
+  if (!state.connected || !state.fullAddress) return;
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(persistProgress, 2500);
+}
+
+async function persistProgress() {
+  if (!state.connected || !state.fullAddress) return;
+  try {
+    await fetch('/api/progress-save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        wallet: state.fullAddress,
+        data: {
+          myXP:          state.myXP,
+          myQuestsDone:  state.myQuestsDone,
+          questSKLZ:     state.questSKLZ,
+          totalEarned:   state.totalEarned,
+          pendingRewards:state.pendingRewards,
+          quests:        state.quests,           // full quest progress + claim state
+          username:      state.profile.username,
+          avatarB64:     state.profile.avatarB64,
+        }
+      })
+    });
+  } catch(e) {
+    console.warn('[persist] save failed:', e.message);
+  }
+}
+
+async function loadProgress(walletAddress) {
+  try {
+    const res = await fetch('/api/progress-load?wallet=' + encodeURIComponent(walletAddress));
+    if (!res.ok) return null;
+    return await res.json();
+  } catch(e) {
+    console.warn('[persist] load failed:', e.message);
+    return null;
+  }
+}
+
+async function loadLeaderboard() {
+  try {
+    const res = await fetch('/api/leaderboard');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.players && data.players.length) {
+      // Replace demo leaderboard with real data, preserving current user's entry
+      state.leaderboard = data.players
+        .filter(p => p.addr !== (state.fullAddress || '').toLowerCase())
+        .map(p => ({
+          addr:      p.shortAddr,
+          fullAddr:  p.addr,
+          name:      p.username || p.shortAddr,
+          avatarB64: p.avatarB64 || '',
+          emoji:     '💀',
+          xp:        p.xp,
+          quests:    p.quests,
+        }));
+      renderLeaderboard();
+    }
+  } catch(e) {
+    console.warn('[persist] leaderboard load failed:', e.message);
+  }
+}
+
 // ══════ SKUL KRITTERS — ApeChain config ══════
 const COLLECTION_ADDRESS = '0x8817b9c17d5c84b21dEC1E1a9E0de606716807B1';
 const APECHAIN_CHAIN_ID  = '0x8173'; // 33139 decimal
@@ -998,6 +1069,36 @@ async function connectWallet(name) {
     renderNFTs();
     loadWalletNFTs(addr);
 
+    // ── Load saved progress from KV ──
+    const saved = await loadProgress(addr);
+    if (saved) {
+      state.myXP          = saved.myXP          || 0;
+      state.myQuestsDone  = saved.myQuestsDone   || 0;
+      state.questSKLZ     = saved.questSKLZ      || 0;
+      state.totalEarned   = saved.totalEarned    || 0;
+      state.pendingRewards= saved.pendingRewards || 0;
+      state.profile.username = saved.username   || '';
+      state.profile.avatarB64= saved.avatarB64  || '';
+      // Restore quest progress — merge saved state into current quest definitions
+      if (saved.quests && Array.isArray(saved.quests)) {
+        saved.quests.forEach(sq => {
+          const q = state.quests.find(q => q.id === sq.id);
+          if (q) {
+            q.progress    = sq.progress    ?? q.progress;
+            q.claimed     = sq.claimed     ?? q.claimed;
+            q.lastClaimed = sq.lastClaimed ?? q.lastClaimed;
+            q.claimCount  = sq.claimCount  ?? q.claimCount;
+            q.linkStatus  = sq.linkStatus  ?? q.linkStatus;
+            q.submittedLink = sq.submittedLink ?? q.submittedLink;
+          }
+        });
+      }
+      toast('👋 Welcome back! Progress restored.');
+      renderAll();
+    }
+    // Load global leaderboard from KV
+    loadLeaderboard();
+
     // ── 6. Listen for account or chain changes ──
     window.ethereum.on('accountsChanged', (accs) => {
       if (accs.length === 0) {
@@ -1064,6 +1165,7 @@ function startRewardAccumulation() {
     if (staked > 0) {
       state.pendingRewards += (state.config.sklzPerDay / 86400) * 2;
       document.getElementById('pendingRewards').textContent = state.pendingRewards.toFixed(4) + ' SKLZ';
+      scheduleSave(); // debounced — won't spam, fires ~2.5s after last tick
     }
   }, 2000);
 }
@@ -1121,6 +1223,7 @@ function claimQuest(id) {
     q.claimed = true;
   }
   updateStats(); renderQuests();
+  scheduleSave();
 }
 
 function isOnCooldown(q) {
@@ -1164,6 +1267,7 @@ function buyItem(id) {
   item.stock--;
   const code = generateCode(item.name);
   showCodeModal(code, item.name);
+  scheduleSave();
   updateStats(); renderShop(); renderAdminShop();
 }
 
@@ -1659,6 +1763,7 @@ function reviewLink(submissionId, decision) {
   }
   renderLinkReview();
   renderQuests();
+  scheduleSave();
 }
 
 // ══════ PROFILE ══════
@@ -1734,6 +1839,7 @@ function handleAvatarUpload(input) {
     renderProfile();
     updateLeaderboard();
     toast('✅ Profile picture updated!');
+    scheduleSave();
   };
   reader.readAsDataURL(file);
 }
@@ -1761,6 +1867,7 @@ function saveUsername() {
   renderProfile();
   renderLeaderboard(); // update leaderboard with new name
   toast('✅ Username saved!');
+  scheduleSave();
 }
 
 function updateLeaderboard() {
