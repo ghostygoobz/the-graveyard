@@ -988,13 +988,14 @@ function decodeUint256Array(hex) {
 
 function setNFTLoadState(loading, msg) {
   state.nftLoading = loading;
-  const banner  = document.getElementById('nftLoadingBanner');
-  const spinner = document.getElementById('nftLoadSpinner');
-  const msgEl   = document.getElementById('nftLoadMsg');
-  if (banner) {
-    banner.style.display = loading ? 'flex' : 'none';
-    if (msgEl) msgEl.textContent = msg || '';
-  }
+  try {
+    const banner  = document.getElementById('nftLoadingBanner');
+    const msgEl   = document.getElementById('nftLoadMsg');
+    if (banner) {
+      banner.style.display = loading ? 'flex' : 'none';
+      if (msgEl) msgEl.textContent = msg || '';
+    }
+  } catch(e) {}
 }
 
 async function connectWallet(name) {
@@ -1069,35 +1070,38 @@ async function connectWallet(name) {
     renderNFTs();
     loadWalletNFTs(addr);
 
-    // ── Load saved progress from KV ──
-    const saved = await loadProgress(addr);
-    if (saved) {
-      state.myXP          = saved.myXP          || 0;
-      state.myQuestsDone  = saved.myQuestsDone   || 0;
-      state.questSKLZ     = saved.questSKLZ      || 0;
-      state.totalEarned   = saved.totalEarned    || 0;
-      state.pendingRewards= saved.pendingRewards || 0;
-      state.profile.username = saved.username   || '';
-      state.profile.avatarB64= saved.avatarB64  || '';
-      // Restore quest progress — merge saved state into current quest definitions
-      if (saved.quests && Array.isArray(saved.quests)) {
-        saved.quests.forEach(sq => {
-          const q = state.quests.find(q => q.id === sq.id);
-          if (q) {
-            q.progress    = sq.progress    ?? q.progress;
-            q.claimed     = sq.claimed     ?? q.claimed;
-            q.lastClaimed = sq.lastClaimed ?? q.lastClaimed;
-            q.claimCount  = sq.claimCount  ?? q.claimCount;
-            q.linkStatus  = sq.linkStatus  ?? q.linkStatus;
-            q.submittedLink = sq.submittedLink ?? q.submittedLink;
-          }
-        });
+    // ── Load saved progress from KV (non-blocking — wallet works even if this fails) ──
+    try {
+      const saved = await loadProgress(addr);
+      if (saved) {
+        state.myXP           = saved.myXP          || 0;
+        state.myQuestsDone   = saved.myQuestsDone  || 0;
+        state.questSKLZ      = saved.questSKLZ     || 0;
+        state.totalEarned    = saved.totalEarned   || 0;
+        state.pendingRewards = saved.pendingRewards || 0;
+        state.profile.username  = saved.username  || '';
+        state.profile.avatarB64 = saved.avatarB64 || '';
+        if (saved.quests && Array.isArray(saved.quests)) {
+          saved.quests.forEach(sq => {
+            const q = state.quests.find(q => q.id === sq.id);
+            if (q) {
+              q.progress      = sq.progress      ?? q.progress;
+              q.claimed       = sq.claimed       ?? q.claimed;
+              q.lastClaimed   = sq.lastClaimed   ?? q.lastClaimed;
+              q.claimCount    = sq.claimCount    ?? q.claimCount;
+              q.linkStatus    = sq.linkStatus    ?? q.linkStatus;
+              q.submittedLink = sq.submittedLink ?? q.submittedLink;
+            }
+          });
+        }
+        toast('👋 Welcome back! Progress restored.');
+        renderAll();
       }
-      toast('👋 Welcome back! Progress restored.');
-      renderAll();
+    } catch(e) {
+      console.warn('[progress] Could not load saved progress:', e.message);
     }
-    // Load global leaderboard from KV
-    loadLeaderboard();
+    // Load global leaderboard (also non-blocking)
+    try { loadLeaderboard(); } catch(e) { console.warn('[leaderboard] load failed:', e.message); }
 
     // ── 6. Listen for account or chain changes ──
     window.ethereum.on('accountsChanged', (accs) => {
