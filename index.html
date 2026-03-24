@@ -712,6 +712,41 @@
 
 </main>
 
+<!-- PROFILE PAGE -->
+  <div class="page" id="page-profile">
+    <div class="profile-hero">
+      <div class="profile-avatar-wrap">
+        <div class="profile-avatar" id="profileAvatarDisplay" onclick="triggerAvatarUpload()">
+          <span id="profileAvatarEmoji">👤</span>
+          <img id="profileAvatarImg" src="" alt="" style="display:none" />
+        </div>
+        <div class="profile-avatar-hint">📷</div>
+        <input type="file" id="avatarFileInput" accept="image/*" style="display:none" onchange="handleAvatarUpload(this)" />
+      </div>
+      <div class="profile-info">
+        <div class="profile-username-wrap" id="usernameDisplayWrap">
+          <span class="profile-username" id="profileUsernameDisplay"></span>
+          <span class="profile-username-placeholder" id="profileUsernamePlaceholder">No username set</span>
+          <button class="edit-username-btn" onclick="startEditUsername()">✏ Edit</button>
+        </div>
+        <div class="username-edit-wrap" id="usernameEditWrap">
+          <input type="text" id="usernameInput" placeholder="Enter username…" maxlength="24" onkeydown="if(event.key==='Enter')saveUsername()" />
+          <button class="save-username-btn" onclick="saveUsername()">Save</button>
+          <button class="cancel-username-btn" onclick="cancelEditUsername()">Cancel</button>
+        </div>
+        <div class="profile-addr" id="profileAddrDisplay"></div>
+        <div class="profile-stats-row">
+          <div class="profile-stat"><div class="pval" id="profileXP">0</div><div class="plbl">XP</div></div>
+          <div class="profile-stat"><div class="pval" id="profileQuests">0</div><div class="plbl">Quests</div></div>
+          <div class="profile-stat"><div class="pval" id="profileSKLZ">0</div><div class="plbl">SKLZ</div></div>
+          <div class="profile-stat"><div class="pval" id="profileStaked">0</div><div class="plbl">Staked</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="section-title"><span class="dot"></span> My Staked Kritters</div>
+    <div class="nft-grid" id="profileNftGrid" style="margin-bottom:2rem"></div>
+  </div>
+
 <!-- Purchase Code Modal -->
 <div class="code-modal" id="codeModal">
   <div class="code-box">
