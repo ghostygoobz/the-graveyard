@@ -940,6 +940,61 @@ async function loadLeaderboard() {
   }
 }
 
+// ── Save quest definitions (called after any admin quest/config change) ──
+async function saveQuestDefinitions() {
+  try {
+    await fetch('/api/quests-save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        quests: state.quests,
+        config: state.config,
+      })
+    });
+  } catch(e) {
+    console.warn('[quests] save failed:', e.message);
+  }
+}
+
+// ── Load quest definitions on startup ──
+async function loadQuestDefinitions() {
+  try {
+    const res = await fetch('/api/quests-load');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.quests && data.quests.length) {
+      // Merge saved definitions with current user progress
+      const userProgress = {};
+      state.quests.forEach(q => {
+        userProgress[q.id] = {
+          progress:    q.progress,
+          claimed:     q.claimed,
+          lastClaimed: q.lastClaimed,
+          claimCount:  q.claimCount,
+          linkStatus:  q.linkStatus,
+          submittedLink: q.submittedLink,
+        };
+      });
+      state.quests = data.quests.map(q => ({
+        ...q,
+        // Restore this user's progress on top of the saved definition
+        progress:    (userProgress[q.id] && userProgress[q.id].progress)    ?? 0,
+        claimed:     (userProgress[q.id] && userProgress[q.id].claimed)     ?? false,
+        lastClaimed: (userProgress[q.id] && userProgress[q.id].lastClaimed) ?? null,
+        claimCount:  (userProgress[q.id] && userProgress[q.id].claimCount)  ?? 0,
+        linkStatus:  (userProgress[q.id] && userProgress[q.id].linkStatus)  ?? null,
+        submittedLink: (userProgress[q.id] && userProgress[q.id].submittedLink) ?? null,
+      }));
+      if (data.config) state.config = { ...state.config, ...data.config };
+      state.nextQuestId = Math.max(...state.quests.map(q => q.id)) + 1;
+      renderQuests();
+      renderAdminQuests();
+    }
+  } catch(e) {
+    console.warn('[quests] load failed:', e.message);
+  }
+}
+
 // ══════ SKUL KRITTERS — ApeChain config ══════
 const COLLECTION_ADDRESS = '0x8817b9c17d5c84b21dEC1E1a9E0de606716807B1';
 const APECHAIN_CHAIN_ID  = '0x8173'; // 33139 decimal
@@ -1577,6 +1632,7 @@ function saveQuest() {
     toast('✅ Quest created!');
   }
   resetQuestForm(); renderAll();
+  saveQuestDefinitions();
 }
 
 function editQuest(id) {
@@ -1604,6 +1660,7 @@ function editQuest(id) {
 function deleteQuest(id) {
   state.quests = state.quests.filter(q=>q.id!==id);
   toast('🗑 Quest deleted'); renderAdminQuests();
+  saveQuestDefinitions();
 }
 
 function resetQuestForm() {
@@ -1705,6 +1762,7 @@ function renderAdminShop() {
 function saveConfig() {
   state.config.sklzPerDay = parseFloat(document.getElementById('cfgSKLZPerDay').value) || 10;
   toast('✅ Config saved!'); updateStats();
+  saveQuestDefinitions();
 }
 
 // ══════ TOAST ══════
@@ -1964,6 +2022,9 @@ setInterval(function() {
 }, 1000);
 
 renderAll();
+
+// Load quest definitions from DB on startup (works even before wallet connect)
+loadQuestDefinitions();
 
 // ══════ SPOOKY MIST ══════
 (function spawnMist() {
