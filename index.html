@@ -940,6 +940,39 @@ async function loadLeaderboard() {
   }
 }
 
+// ── Save shop items ──
+async function saveShopDefinitions() {
+  try {
+    await fetch('/api/shop-save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        shopItems:  state.shopItems,
+        nextShopId: state.nextShopId,
+      })
+    });
+  } catch(e) {
+    console.warn('[shop] save failed:', e.message);
+  }
+}
+
+// ── Load shop items on startup ──
+async function loadShopDefinitions() {
+  try {
+    const res = await fetch('/api/shop-load');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.shopItems && data.shopItems.length) {
+      state.shopItems  = data.shopItems;
+      state.nextShopId = data.nextShopId || (Math.max(...data.shopItems.map(i => i.id)) + 1);
+      renderShop();
+      renderAdminShop();
+    }
+  } catch(e) {
+    console.warn('[shop] load failed:', e.message);
+  }
+}
+
 // ── Save quest definitions (called after any admin quest/config change) ──
 async function saveQuestDefinitions() {
   try {
@@ -1708,6 +1741,7 @@ function saveShopItem() {
     toast('✅ Item added to Emporium!');
   }
   resetShopForm(); renderAll();
+  saveShopDefinitions();
 }
 
 function editShopItem(id) {
@@ -1730,6 +1764,7 @@ function editShopItem(id) {
 function deleteShopItem(id) {
   state.shopItems = state.shopItems.filter(i=>i.id!==id);
   toast('🗑 Item removed'); renderAdminShop(); renderShop();
+  saveShopDefinitions();
 }
 
 function resetShopForm() {
@@ -2023,8 +2058,9 @@ setInterval(function() {
 
 renderAll();
 
-// Load quest definitions from DB on startup (works even before wallet connect)
+// Load quest and shop definitions from DB on startup
 loadQuestDefinitions();
+loadShopDefinitions();
 
 // ══════ SPOOKY MIST ══════
 (function spawnMist() {
