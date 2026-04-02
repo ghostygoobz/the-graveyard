@@ -708,6 +708,28 @@
       <div class="form-group"><label>SKLZ per NFT per Day</label><input type="number" id="cfgSKLZPerDay" value="10" min="0.01" step="0.01" /></div>
       <button class="btn btn-success" style="width:auto;padding:.6rem 1.5rem" onclick="saveConfig()">Apply Config</button>
     </div>
+
+    <div class="divider"></div>
+
+    <!-- Bonus SKLZ -->
+    <div class="card" style="max-width:480px">
+      <div class="section-title" style="font-size:1rem"><span class="dot" style="background:var(--gold)"></span> Grant Bonus SKLZ</div>
+      <p style="font-size:.82rem;color:var(--muted);font-style:italic;margin-bottom:1.2rem">Manually award SKLZ to any wallet address as a bonus reward.</p>
+      <div class="form-group">
+        <label>Wallet Address</label>
+        <input type="text" id="bonusWallet" placeholder="0x..." style="font-family:var(--font-mono);font-size:.8rem" />
+      </div>
+      <div class="form-group">
+        <label>SKLZ Amount</label>
+        <input type="number" id="bonusAmount" placeholder="e.g. 500" min="1" step="1" />
+      </div>
+      <div class="form-group">
+        <label>Reason <span style="font-style:italic;font-weight:400;text-transform:none;letter-spacing:0">(optional — shown in history)</span></label>
+        <input type="text" id="bonusReason" placeholder="e.g. Community giveaway winner" />
+      </div>
+      <button class="btn btn-success" style="width:auto;padding:.6rem 1.5rem" onclick="grantBonusSKLZ()">💀 Grant SKLZ</button>
+      <div id="bonusHistory" style="margin-top:1.5rem"></div>
+    </div>
   </div>
 
 </main>
@@ -839,6 +861,7 @@ function checkAdminPassword() {
     state.adminUnlocked = true;
     document.getElementById('adminGate').style.display = 'none';
     performShowPage('admin', state.pendingAdminNav);
+    loadBonusHistory();
   } else {
     document.getElementById('gateError').textContent = 'Incorrect password. Try again.';
     document.getElementById('adminPwInput').value = '';
@@ -937,6 +960,38 @@ async function loadLeaderboard() {
     }
   } catch(e) {
     console.warn('[persist] leaderboard load failed:', e.message);
+  }
+}
+
+// ── Save link submissions queue ──
+async function saveSubmissions() {
+  try {
+    await fetch('/api/submissions-save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        submissions:      state.linkSubmissions,
+        nextSubmissionId: state.nextSubmissionId,
+      })
+    });
+  } catch(e) {
+    console.warn('[submissions] save failed:', e.message);
+  }
+}
+
+// ── Load link submissions on startup (admin sees full queue immediately) ──
+async function loadSubmissions() {
+  try {
+    const res = await fetch('/api/submissions-load');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.submissions) {
+      state.linkSubmissions  = data.submissions;
+      state.nextSubmissionId = data.nextSubmissionId || (state.linkSubmissions.length + 1);
+      renderLinkReview();
+    }
+  } catch(e) {
+    console.warn('[submissions] load failed:', e.message);
   }
 }
 
@@ -1809,6 +1864,74 @@ function toast(msg) {
   toastTimer = setTimeout(()=>el.classList.remove('show'), 3000);
 }
 
+// ══════ BONUS SKLZ ══════
+async function grantBonusSKLZ() {
+  const wallet = document.getElementById('bonusWallet').value.trim().toLowerCase();
+  const amount = parseInt(document.getElementById('bonusAmount').value) || 0;
+  const reason = document.getElementById('bonusReason').value.trim() || 'Admin bonus';
+
+  if (!wallet || !wallet.startsWith('0x') || wallet.length < 10) {
+    toast('⚠ Please enter a valid wallet address'); return;
+  }
+  if (amount < 1) {
+    toast('⚠ Amount must be at least 1 SKLZ'); return;
+  }
+
+  // If this is the currently connected wallet, apply immediately to their session
+  if (state.connected && state.fullAddress && state.fullAddress.toLowerCase() === wallet) {
+    state.questSKLZ += amount;
+    updateStats();
+    toast('💀 Granted ' + amount + ' SKLZ to your own wallet!');
+  } else {
+    toast('💀 Granting ' + amount + ' SKLZ to ' + wallet.slice(0,6) + '...' + wallet.slice(-4) + '…');
+  }
+
+  // Save the bonus to this wallet's KV record
+  try {
+    const res = await fetch('/api/bonus-grant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallet, amount, reason })
+    });
+    if (res.ok) {
+      toast('✅ ' + amount + ' SKLZ granted successfully!');
+      document.getElementById('bonusWallet').value = '';
+      document.getElementById('bonusAmount').value = '';
+      document.getElementById('bonusReason').value = '';
+      loadBonusHistory();
+    } else {
+      toast('⚠ Grant saved but API returned an error — check console');
+    }
+  } catch(e) {
+    console.warn('[bonus] grant failed:', e.message);
+    toast('⚠ Could not reach server — try again');
+  }
+}
+
+async function loadBonusHistory() {
+  try {
+    const res = await fetch('/api/bonus-history');
+    if (!res.ok) return;
+    const data = await res.json();
+    const el = document.getElementById('bonusHistory');
+    if (!el) return;
+    if (!data || !data.grants || !data.grants.length) {
+      el.innerHTML = '<div style="font-size:.75rem;color:var(--muted);font-style:italic">No bonuses granted yet.</div>';
+      return;
+    }
+    el.innerHTML = '<div style="font-family:var(--font-head);font-size:.65rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.6rem">Recent Grants</div>'
+      + data.grants.slice().reverse().slice(0, 10).map(g =>
+        '<div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .7rem;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:7px;margin-bottom:.4rem;font-size:.75rem">'
+        + '<div><div style="font-family:var(--font-mono);color:var(--accent)">'+ g.wallet.slice(0,6)+'...'+g.wallet.slice(-4) +'</div>'
+        + '<div style="color:var(--muted);font-style:italic;margin-top:.1rem">'+ g.reason +'</div></div>'
+        + '<div style="font-family:var(--font-mono);color:var(--gold);font-weight:700">+'+ g.amount +' SKLZ</div>'
+        + '</div>'
+      ).join('');
+  } catch(e) {
+    console.warn('[bonus] history load failed:', e.message);
+  }
+}
+
 // ══════ LINK SUBMISSION ══════
 function submitQuestLink(questId) {
   if (!state.connected) { openWalletModal(); return; }
@@ -1840,6 +1963,8 @@ function submitQuestLink(questId) {
   toast('📨 Link submitted! Awaiting admin review.');
   renderQuests();
   renderLinkReview();
+  saveSubmissions();
+  scheduleSave(); // also save the quest's linkStatus on the user's record
 }
 
 // ══════ ADMIN LINK REVIEW ══════
@@ -1899,6 +2024,7 @@ function reviewLink(submissionId, decision) {
   renderLinkReview();
   renderQuests();
   scheduleSave();
+  saveSubmissions();
 }
 
 // ══════ PROFILE ══════
@@ -2058,9 +2184,10 @@ setInterval(function() {
 
 renderAll();
 
-// Load quest and shop definitions from DB on startup
+// Load quest, shop and submissions from DB on startup
 loadQuestDefinitions();
 loadShopDefinitions();
+loadSubmissions();
 
 // ══════ SPOOKY MIST ══════
 (function spawnMist() {
