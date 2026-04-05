@@ -1163,8 +1163,8 @@ async function fetchSkulKritters(ownerAddress) {
     const isTempId  = tid < 0;
     return {
       tokenId: tid,
-      id: isTempId ? '#????' : '#' + String(tid).padStart(4, '0'),
-      name: isTempId ? 'Skul Kritter' : 'Skul Kritter #' + tid,
+      id: isTempId ? ('Kritter ' + String(Math.abs(tid))) : '#' + String(tid).padStart(4, '0'),
+      name: isTempId ? ('Skul Kritter ' + String(Math.abs(tid))) : 'Skul Kritter #' + tid,
       image: '',
       bg: '#120810',
       staked: existing ? existing.staked : false,
@@ -1268,6 +1268,9 @@ async function connectWallet(name) {
     if (_pnb) _pnb.style.display = 'flex';
     toast('☠ Connected — fetching your Kritters…');
     renderNFTs();
+    // Show 0.00 immediately while loading so display isn't stale
+    const prElInit = document.getElementById('pendingRewards');
+    if (prElInit) prElInit.textContent = '0.0000 SKLZ';
 
     // ── Step 1: Load saved progress first so stakedTokenIds are ready ──
     try {
@@ -1277,7 +1280,17 @@ async function connectWallet(name) {
         state.myQuestsDone      = saved.myQuestsDone   || 0;
         state.questSKLZ         = saved.questSKLZ      || 0;
         state.totalEarned       = saved.totalEarned    || 0;
-        state.pendingRewards    = saved.pendingRewards  || 0;
+        // Restore pending rewards and add any time elapsed since last save
+        const savedTime     = saved.updatedAt || Date.now();
+        const elapsedSecs   = Math.max(0, (Date.now() - savedTime) / 1000);
+        const savedStakedCount = (saved.stakedTokenIds || []).length;
+        const accruedWhileAway = savedStakedCount > 0
+          ? (state.config.sklzPerDay / 86400) * elapsedSecs * savedStakedCount
+          : 0;
+        state.pendingRewards = (saved.pendingRewards || 0) + accruedWhileAway;
+        if (accruedWhileAway > 0) {
+          console.log('[rewards] Added', accruedWhileAway.toFixed(4), 'SKLZ for', Math.round(elapsedSecs), 's elapsed with', savedStakedCount, 'staked');
+        }
         state.profile.username  = saved.username        || '';
         state.profile.avatarB64 = saved.avatarB64       || '';
         state._savedStakedTokenIds = saved.stakedTokenIds || [];
@@ -1365,6 +1378,8 @@ async function loadWalletNFTs(ownerAddress) {
       toast('✅ Found ' + fresh.length + ' Skul Kritter' + (fresh.length>1?'s':'') + '!');
     }
     updateStakerRegistry(); // register wallet with current staked state
+    // Immediately persist allTokenIds so next reconnect can restore them
+    persistProgress();
   } catch(err) {
     setNFTLoadState(false);
     // Fallback: show a demo mode message but still let them explore
@@ -1381,13 +1396,16 @@ async function loadWalletNFTs(ownerAddress) {
 
 function startRewardAccumulation() {
   if (state.rewardInterval) clearInterval(state.rewardInterval);
+  let _tickCount = 0;
   state.rewardInterval = setInterval(() => {
     const staked = state.nfts.filter(n=>n.staked).length;
     if (staked > 0) {
       state.pendingRewards += (state.config.sklzPerDay / 86400) * 2;
       const prEl = document.getElementById('pendingRewards');
       if (prEl) prEl.textContent = state.pendingRewards.toFixed(4) + ' SKLZ';
-      scheduleSave(); // debounced — won't spam, fires ~2.5s after last tick
+      _tickCount++;
+      // Save to DB every 5 ticks (every 10 seconds) to minimise lost rewards on disconnect
+      if (_tickCount % 5 === 0) persistProgress();
     }
   }, 2000);
 }
