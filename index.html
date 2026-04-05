@@ -915,7 +915,7 @@ function scheduleSave() {
 async function persistProgress() {
   if (!state.connected || !state.fullAddress) return;
   try {
-    await fetch('/api/progress-save', {
+    await fetch('/api/db?action=progress-save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -941,7 +941,7 @@ async function persistProgress() {
 
 async function loadProgress(walletAddress) {
   try {
-    const res = await fetch('/api/progress-load?wallet=' + encodeURIComponent(walletAddress));
+    const res = await fetch('/api/db?action=progress-load?wallet=' + encodeURIComponent(walletAddress));
     if (!res.ok) return null;
     return await res.json();
   } catch(e) {
@@ -952,7 +952,7 @@ async function loadProgress(walletAddress) {
 
 async function loadLeaderboard() {
   try {
-    const res = await fetch('/api/leaderboard');
+    const res = await fetch('/api/db?action=leaderboard');
     if (!res.ok) return;
     const data = await res.json();
     if (data.players && data.players.length) {
@@ -978,7 +978,7 @@ async function loadLeaderboard() {
 // ── Save link submissions queue ──
 async function saveSubmissions() {
   try {
-    await fetch('/api/submissions-save', {
+    await fetch('/api/db?action=submissions-save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -994,7 +994,7 @@ async function saveSubmissions() {
 // ── Load link submissions on startup (admin sees full queue immediately) ──
 async function loadSubmissions() {
   try {
-    const res = await fetch('/api/submissions-load');
+    const res = await fetch('/api/db?action=submissions-load');
     if (!res.ok) return;
     const data = await res.json();
     if (data && data.submissions) {
@@ -1010,7 +1010,7 @@ async function loadSubmissions() {
 // ── Save shop items ──
 async function saveShopDefinitions() {
   try {
-    await fetch('/api/shop-save', {
+    await fetch('/api/db?action=shop-save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1026,7 +1026,7 @@ async function saveShopDefinitions() {
 // ── Load shop items on startup ──
 async function loadShopDefinitions() {
   try {
-    const res = await fetch('/api/shop-load');
+    const res = await fetch('/api/db?action=shop-load');
     if (!res.ok) return;
     const data = await res.json();
     if (data && data.shopItems && data.shopItems.length) {
@@ -1043,7 +1043,7 @@ async function loadShopDefinitions() {
 // ── Save quest definitions (called after any admin quest/config change) ──
 async function saveQuestDefinitions() {
   try {
-    await fetch('/api/quests-save', {
+    await fetch('/api/db?action=quests-save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1059,7 +1059,7 @@ async function saveQuestDefinitions() {
 // ── Load quest definitions on startup ──
 async function loadQuestDefinitions() {
   try {
-    const res = await fetch('/api/quests-load');
+    const res = await fetch('/api/db?action=quests-load');
     if (!res.ok) return;
     const data = await res.json();
     if (data && data.quests && data.quests.length) {
@@ -1913,7 +1913,7 @@ async function updateStakerRegistry() {
   if (!state.connected || !state.fullAddress) return;
   const stakedIds = state.nfts.filter(n => n.staked).map(n => n.tokenId);
   try {
-    await fetch('/api/stakers-update', {
+    await fetch('/api/db?action=stakers-update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1932,7 +1932,7 @@ async function updateStakerRegistry() {
 
 async function loadActiveStakers() {
   try {
-    const res = await fetch('/api/stakers-list');
+    const res = await fetch('/api/db?action=stakers-list');
     if (!res.ok) return;
     const data = await res.json();
     const el = document.getElementById('activeStakersList');
@@ -1989,7 +1989,7 @@ async function grantBonusSKLZ() {
 
   // Save the bonus to this wallet's KV record
   try {
-    const res = await fetch('/api/bonus-grant', {
+    const res = await fetch('/api/db?action=bonus-grant', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ wallet, amount, reason })
@@ -2011,7 +2011,7 @@ async function grantBonusSKLZ() {
 
 async function loadBonusHistory() {
   try {
-    const res = await fetch('/api/bonus-history');
+    const res = await fetch('/api/db?action=bonus-history');
     if (!res.ok) return;
     const data = await res.json();
     const el = document.getElementById('bonusHistory');
