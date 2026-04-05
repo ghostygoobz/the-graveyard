@@ -911,14 +911,16 @@ async function persistProgress() {
       body: JSON.stringify({
         wallet: state.fullAddress,
         data: {
-          myXP:          state.myXP,
-          myQuestsDone:  state.myQuestsDone,
-          questSKLZ:     state.questSKLZ,
-          totalEarned:   state.totalEarned,
-          pendingRewards:state.pendingRewards,
-          quests:        state.quests,           // full quest progress + claim state
-          username:      state.profile.username,
-          avatarB64:     state.profile.avatarB64,
+          myXP:           state.myXP,
+          myQuestsDone:   state.myQuestsDone,
+          questSKLZ:      state.questSKLZ,
+          totalEarned:    state.totalEarned,
+          pendingRewards: state.pendingRewards,
+          quests:         state.quests,
+          username:       state.profile.username,
+          avatarB64:      state.profile.avatarB64,
+          // Save which token IDs are staked so they restore on reconnect
+          stakedTokenIds: state.nfts.filter(n => n.staked).map(n => n.tokenId),
         }
       })
     });
@@ -1260,6 +1262,8 @@ async function connectWallet(name) {
         state.pendingRewards = saved.pendingRewards || 0;
         state.profile.username  = saved.username  || '';
         state.profile.avatarB64 = saved.avatarB64 || '';
+        // Store for use when NFTs finish loading from chain
+        state._savedStakedTokenIds = saved.stakedTokenIds || [];
         if (saved.quests && Array.isArray(saved.quests)) {
           saved.quests.forEach(sq => {
             const q = state.quests.find(q => q.id === sq.id);
@@ -1319,8 +1323,11 @@ async function loadWalletNFTs(ownerAddress) {
   try {
     const fresh = await fetchSkulKritters(ownerAddress);
     // Preserve staked state from any prior load
-    const stakedIds = new Set(state.nfts.filter(n=>n.staked).map(n=>n.tokenId));
-    state.nfts = fresh.map(n => ({ ...n, staked: stakedIds.has(n.tokenId) }));
+    // Merge: keep previously staked state from memory AND from saved DB record
+    const stakedFromMemory = new Set(state.nfts.filter(n=>n.staked).map(n=>n.tokenId));
+    const stakedFromDB     = new Set(state._savedStakedTokenIds || []);
+    const allStaked        = new Set([...stakedFromMemory, ...stakedFromDB]);
+    state.nfts = fresh.map(n => ({ ...n, staked: allStaked.has(n.tokenId) }));
     setNFTLoadState(false);
     updateStats();
     renderNFTs();
@@ -1365,6 +1372,7 @@ function toggleStake(idx) {
   if (nft.staked) autoProgress(1, 1);
   autoProgress(3, staked);
   updateStats(); renderNFTs();
+  scheduleSave(); // persist staked state
 }
 
 function claimRewards() {
@@ -1453,6 +1461,7 @@ function buyItem(id) {
   const code = generateCode(item.name);
   showCodeModal(code, item.name);
   scheduleSave();
+  saveShopDefinitions(); // immediately persist stock reduction to DB
   updateStats(); renderShop(); renderAdminShop();
 }
 
