@@ -1348,6 +1348,8 @@ async function loadWalletNFTs(ownerAddress) {
       toast('✅ Found ' + fresh.length + ' Skul Kritter' + (fresh.length>1?'s':'') + '!');
     }
     updateStakerRegistry(); // register wallet with current staked state
+    // Restart accumulation now that staked state is fully restored from DB
+    startRewardAccumulation();
   } catch(err) {
     setNFTLoadState(false);
     // Fallback: show a demo mode message but still let them explore
@@ -1368,7 +1370,8 @@ function startRewardAccumulation() {
     const staked = state.nfts.filter(n=>n.staked).length;
     if (staked > 0) {
       state.pendingRewards += (state.config.sklzPerDay / 86400) * 2;
-      document.getElementById('pendingRewards').textContent = state.pendingRewards.toFixed(4) + ' SKLZ';
+      const prEl = document.getElementById('pendingRewards');
+      if (prEl) prEl.textContent = state.pendingRewards.toFixed(4) + ' SKLZ';
       scheduleSave(); // debounced — won't spam, fires ~2.5s after last tick
     }
   }, 2000);
