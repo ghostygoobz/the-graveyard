@@ -1396,16 +1396,20 @@ async function loadWalletNFTs(ownerAddress) {
 
 function startRewardAccumulation() {
   if (state.rewardInterval) clearInterval(state.rewardInterval);
-  let _tickCount = 0;
+  let _lastSaveTime = Date.now();
   state.rewardInterval = setInterval(() => {
     const staked = state.nfts.filter(n=>n.staked).length;
     if (staked > 0) {
       state.pendingRewards += (state.config.sklzPerDay / 86400) * 2;
       const prEl = document.getElementById('pendingRewards');
       if (prEl) prEl.textContent = state.pendingRewards.toFixed(4) + ' SKLZ';
-      _tickCount++;
-      // Save to DB every 5 ticks (every 10 seconds) to minimise lost rewards on disconnect
-      if (_tickCount % 5 === 0) persistProgress();
+      // Save every 3 seconds — tight enough that very little is lost on crash
+      // beforeunload beacon handles normal tab close with zero loss
+      const now = Date.now();
+      if (now - _lastSaveTime >= 3000) {
+        _lastSaveTime = now;
+        persistProgress();
+      }
     }
   }, 2000);
 }
