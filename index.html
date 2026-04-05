@@ -711,6 +711,15 @@
 
     <div class="divider"></div>
 
+    <!-- Active Stakers -->
+    <div class="card" style="margin-bottom:2rem">
+      <div class="section-title" style="font-size:1rem"><span class="dot" style="background:var(--accent2)"></span> Active Stakers <span id="activeStakersCount" style="font-family:var(--font-mono);font-size:.7rem;color:var(--muted);background:rgba(232,135,58,0.1);border:1px solid rgba(232,135,58,0.2);border-radius:4px;padding:.1rem .5rem;margin-left:.4rem"></span></div>
+      <p style="font-size:.82rem;color:var(--muted);font-style:italic;margin-bottom:1.2rem">Wallets that currently have Skul Kritters staked. Updates when members stake or unstake.</p>
+      <div id="activeStakersList"><div style="font-size:.82rem;color:var(--muted);font-style:italic">Loading…</div></div>
+    </div>
+
+    <div class="divider"></div>
+
     <!-- Bonus SKLZ -->
     <div class="card" style="max-width:480px">
       <div class="section-title" style="font-size:1rem"><span class="dot" style="background:var(--gold)"></span> Grant Bonus SKLZ</div>
@@ -862,6 +871,7 @@ function checkAdminPassword() {
     document.getElementById('adminGate').style.display = 'none';
     performShowPage('admin', state.pendingAdminNav);
     loadBonusHistory();
+    loadActiveStakers();
   } else {
     document.getElementById('gateError').textContent = 'Incorrect password. Try again.';
     document.getElementById('adminPwInput').value = '';
@@ -1247,11 +1257,10 @@ async function connectWallet(name) {
     const _pnb = document.getElementById('profileNavBtn');
     if (_pnb) _pnb.style.display = 'flex';
     toast('☠ Connected — fetching your Kritters…');
-    startRewardAccumulation();
     renderNFTs();
     loadWalletNFTs(addr);
 
-    // ── Load saved progress from KV (non-blocking — wallet works even if this fails) ──
+    // ── Load saved progress FIRST, then start accumulation from correct value ──
     try {
       const saved = await loadProgress(addr);
       if (saved) {
@@ -1259,7 +1268,7 @@ async function connectWallet(name) {
         state.myQuestsDone   = saved.myQuestsDone  || 0;
         state.questSKLZ      = saved.questSKLZ     || 0;
         state.totalEarned    = saved.totalEarned   || 0;
-        state.pendingRewards = saved.pendingRewards || 0;
+        state.pendingRewards = saved.pendingRewards || 0; // restore exact pending amount
         state.profile.username  = saved.username  || '';
         state.profile.avatarB64 = saved.avatarB64 || '';
         // Store for use when NFTs finish loading from chain
@@ -1283,6 +1292,8 @@ async function connectWallet(name) {
     } catch(e) {
       console.warn('[progress] Could not load saved progress:', e.message);
     }
+    // Start reward accumulation NOW — after pending rewards have been restored
+    startRewardAccumulation();
     // Load global leaderboard (also non-blocking)
     try { loadLeaderboard(); } catch(e) { console.warn('[leaderboard] load failed:', e.message); }
 
@@ -1336,6 +1347,7 @@ async function loadWalletNFTs(ownerAddress) {
     } else {
       toast('✅ Found ' + fresh.length + ' Skul Kritter' + (fresh.length>1?'s':'') + '!');
     }
+    updateStakerRegistry(); // register wallet with current staked state
   } catch(err) {
     setNFTLoadState(false);
     // Fallback: show a demo mode message but still let them explore
@@ -1373,6 +1385,8 @@ function toggleStake(idx) {
   autoProgress(3, staked);
   updateStats(); renderNFTs();
   scheduleSave(); // persist staked state
+  // Update staker registry for admin panel
+  updateStakerRegistry();
 }
 
 function claimRewards() {
@@ -1871,6 +1885,63 @@ function toast(msg) {
   el.textContent = msg; el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(()=>el.classList.remove('show'), 3000);
+}
+
+// ══════ ACTIVE STAKER REGISTRY ══════
+async function updateStakerRegistry() {
+  if (!state.connected || !state.fullAddress) return;
+  const stakedIds = state.nfts.filter(n => n.staked).map(n => n.tokenId);
+  try {
+    await fetch('/api/stakers-update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        wallet:        state.fullAddress.toLowerCase(),
+        shortAddr:     state.address,
+        username:      state.profile.username || '',
+        stakedCount:   stakedIds.length,
+        stakedTokenIds: stakedIds,
+        lastSeen:      new Date().toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }),
+      })
+    });
+  } catch(e) {
+    console.warn('[stakers] registry update failed:', e.message);
+  }
+}
+
+async function loadActiveStakers() {
+  try {
+    const res = await fetch('/api/stakers-list');
+    if (!res.ok) return;
+    const data = await res.json();
+    const el = document.getElementById('activeStakersList');
+    if (!el) return;
+    const stakers = (data.stakers || []).filter(s => s.stakedCount > 0);
+    const all     = data.stakers || [];
+
+    // Update counts
+    const countEl = document.getElementById('activeStakersCount');
+    if (countEl) countEl.textContent = stakers.length + ' active / ' + all.length + ' total wallets';
+
+    if (!stakers.length) {
+      el.innerHTML = '<div style="font-size:.82rem;color:var(--muted);font-style:italic;padding:1rem 0">No wallets currently staking.</div>';
+      return;
+    }
+    el.innerHTML = stakers.map(s =>
+      '<div style="display:flex;align-items:center;gap:.8rem;padding:.7rem .9rem;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;margin-bottom:.4rem">'
+      + '<div style="flex:1">'
+      + '<div style="font-family:var(--font-head);font-size:.78rem;color:var(--bone)">' + (s.username || s.shortAddr) + '</div>'
+      + '<div style="font-family:var(--font-mono);font-size:.65rem;color:var(--muted)">' + s.shortAddr + ' · Last seen ' + s.lastSeen + '</div>'
+      + '</div>'
+      + '<div style="text-align:right">'
+      + '<div style="font-family:var(--font-mono);font-weight:700;color:var(--accent2)">' + s.stakedCount + ' staked</div>'
+      + '<div style="font-size:.65rem;color:var(--muted)">Token IDs: ' + (s.stakedTokenIds || []).join(', ') + '</div>'
+      + '</div>'
+      + '</div>'
+    ).join('');
+  } catch(e) {
+    console.warn('[stakers] load failed:', e.message);
+  }
 }
 
 // ══════ BONUS SKLZ ══════
