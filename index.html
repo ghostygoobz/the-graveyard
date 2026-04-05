@@ -1128,8 +1128,7 @@ async function fetchSkulKritters(ownerAddress) {
   console.log('[Kritter] balance:', balance);
   if (!balance || isNaN(balance)) return [];
 
-  // tokensOfOwner(address) — ERC721A batch function (selector: 0x8462151c)
-  // Falls back to looping tokenOfOwnerByIndex if needed
+  // Try tokensOfOwner (ERC721A batch — selector 0x8462151c)
   let tokenIds = [];
   try {
     const result = await rpcCall('eth_call', [{
@@ -1137,25 +1136,40 @@ async function fetchSkulKritters(ownerAddress) {
       data: '0x8462151c' + padAddress(ownerAddress)
     }, 'latest']);
     tokenIds = decodeUint256Array(result);
-    console.log('[Kritter] tokensOfOwner result:', tokenIds);
+    console.log('[Kritter] tokensOfOwner returned', tokenIds.length, 'IDs');
   } catch(e) {
-    console.warn('[Kritter] tokensOfOwner failed, falling back to index loop:', e.message);
-    for (let i = 0; i < balance; i++) {
-      const tidHex = await rpcCall('eth_call', [{
-        to: COLLECTION_ADDRESS,
-        data: '0x2f745c59' + padAddress(ownerAddress) + i.toString(16).padStart(64, '0')
-      }, 'latest']);
-      tokenIds.push(parseInt(tidHex, 16));
+    console.warn('[Kritter] tokensOfOwner failed:', e.message);
+  }
+
+  // If we couldn't get token IDs, generate sequential placeholders based on balance
+  // The user still sees their correct count of Kritters with staking working
+  if (!tokenIds.length && balance > 0) {
+    console.warn('[Kritter] Using balance-based placeholders for', balance, 'NFTs');
+    // Use saved staked token IDs if we have them, otherwise generate temp IDs
+    const savedIds = state._savedStakedTokenIds || [];
+    if (savedIds.length > 0) {
+      // We know their real token IDs from last session — use those
+      tokenIds = savedIds.slice(0, balance);
+      // Fill remaining with temp IDs if balance grew
+      for (let i = savedIds.length; i < balance; i++) {
+        tokenIds.push(-(i + 1)); // negative = temp placeholder ID
+      }
+    } else {
+      // No saved IDs — generate temp placeholder IDs
+      for (let i = 0; i < balance; i++) {
+        tokenIds.push(-(i + 1));
+      }
     }
   }
 
   return tokenIds.map(tid => {
     const existing = state.nfts.find(n => n.tokenId === tid);
+    const isTempId  = tid < 0;
     return {
       tokenId: tid,
-      id: '#' + String(tid).padStart(4, '0'),
-      name: 'Skul Kritter #' + tid,
-      image: '',          // placeholder skull shown in card
+      id: isTempId ? '#????' : '#' + String(tid).padStart(4, '0'),
+      name: isTempId ? 'Skul Kritter' : 'Skul Kritter #' + tid,
+      image: '',
       bg: '#120810',
       staked: existing ? existing.staked : false,
     };
@@ -1258,20 +1272,18 @@ async function connectWallet(name) {
     if (_pnb) _pnb.style.display = 'flex';
     toast('☠ Connected — fetching your Kritters…');
     renderNFTs();
-    loadWalletNFTs(addr);
 
-    // ── Load saved progress FIRST, then start accumulation from correct value ──
+    // ── Step 1: Load saved progress first so stakedTokenIds are ready ──
     try {
       const saved = await loadProgress(addr);
       if (saved) {
-        state.myXP           = saved.myXP          || 0;
-        state.myQuestsDone   = saved.myQuestsDone  || 0;
-        state.questSKLZ      = saved.questSKLZ     || 0;
-        state.totalEarned    = saved.totalEarned   || 0;
-        state.pendingRewards = saved.pendingRewards || 0; // restore exact pending amount
-        state.profile.username  = saved.username  || '';
-        state.profile.avatarB64 = saved.avatarB64 || '';
-        // Store for use when NFTs finish loading from chain
+        state.myXP              = saved.myXP           || 0;
+        state.myQuestsDone      = saved.myQuestsDone   || 0;
+        state.questSKLZ         = saved.questSKLZ      || 0;
+        state.totalEarned       = saved.totalEarned    || 0;
+        state.pendingRewards    = saved.pendingRewards  || 0;
+        state.profile.username  = saved.username        || '';
+        state.profile.avatarB64 = saved.avatarB64       || '';
         state._savedStakedTokenIds = saved.stakedTokenIds || [];
         if (saved.quests && Array.isArray(saved.quests)) {
           saved.quests.forEach(sq => {
@@ -1286,15 +1298,23 @@ async function connectWallet(name) {
             }
           });
         }
+        // Update pending rewards display immediately
+        const prEl = document.getElementById('pendingRewards');
+        if (prEl) prEl.textContent = state.pendingRewards.toFixed(4) + ' SKLZ';
         toast('👋 Welcome back! Progress restored.');
         renderAll();
       }
     } catch(e) {
       console.warn('[progress] Could not load saved progress:', e.message);
     }
-    // Start reward accumulation NOW — after pending rewards have been restored
+
+    // ── Step 2: Load NFTs — staked state from DB is now ready in _savedStakedTokenIds ──
+    await loadWalletNFTs(addr);
+
+    // ── Step 3: Now that staked NFTs are restored, start accumulation ──
     startRewardAccumulation();
-    // Load global leaderboard (also non-blocking)
+
+    // Load global leaderboard (non-blocking)
     try { loadLeaderboard(); } catch(e) { console.warn('[leaderboard] load failed:', e.message); }
 
     // ── 6. Listen for account or chain changes ──
@@ -1348,8 +1368,6 @@ async function loadWalletNFTs(ownerAddress) {
       toast('✅ Found ' + fresh.length + ' Skul Kritter' + (fresh.length>1?'s':'') + '!');
     }
     updateStakerRegistry(); // register wallet with current staked state
-    // Restart accumulation now that staked state is fully restored from DB
-    startRewardAccumulation();
   } catch(err) {
     setNFTLoadState(false);
     // Fallback: show a demo mode message but still let them explore
