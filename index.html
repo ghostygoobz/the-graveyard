@@ -1405,7 +1405,8 @@ function toggleStake(idx) {
   if (nft.staked) autoProgress(1, 1);
   autoProgress(3, staked);
   updateStats(); renderNFTs();
-  scheduleSave(); // persist staked state
+  // Save immediately — don't debounce staking changes
+  persistProgress();
   // Update staker registry for admin panel
   updateStakerRegistry();
 }
@@ -1419,6 +1420,7 @@ function claimRewards() {
   autoProgress(6, 1);
   toast('💰 Claimed ' + amt + ' SKLZ!');
   updateStats();
+  persistProgress(); // save immediately after claim
 }
 
 function autoProgress(questId, val) {
@@ -2284,6 +2286,27 @@ setInterval(function() {
 }, 1000);
 
 renderAll();
+
+// Flush any pending save when the tab/window closes
+window.addEventListener('beforeunload', function() {
+  if (state.connected && state.fullAddress) {
+    const payload = JSON.stringify({
+      wallet: state.fullAddress,
+      data: {
+        myXP:           state.myXP,
+        myQuestsDone:   state.myQuestsDone,
+        questSKLZ:      state.questSKLZ,
+        totalEarned:    state.totalEarned,
+        pendingRewards: state.pendingRewards,
+        quests:         state.quests,
+        username:       state.profile.username,
+        avatarB64:      state.profile.avatarB64,
+        stakedTokenIds: state.nfts.filter(n => n.staked).map(n => n.tokenId),
+      }
+    });
+    navigator.sendBeacon('/api/db?action=progress-save', new Blob([payload], { type: 'application/json' }));
+  }
+});
 
 // Load quest, shop and submissions from DB on startup
 loadQuestDefinitions();
