@@ -929,7 +929,8 @@ async function persistProgress() {
           quests:         state.quests,
           username:       state.profile.username,
           avatarB64:      state.profile.avatarB64,
-          // Save which token IDs are staked so they restore on reconnect
+          // Save all token IDs and which are staked so they restore on reconnect
+          allTokenIds:    state.nfts.map(n => n.tokenId),
           stakedTokenIds: state.nfts.filter(n => n.staked).map(n => n.tokenId),
         }
       })
@@ -1141,24 +1142,19 @@ async function fetchSkulKritters(ownerAddress) {
     console.warn('[Kritter] tokensOfOwner failed:', e.message);
   }
 
-  // If we couldn't get token IDs, generate sequential placeholders based on balance
-  // The user still sees their correct count of Kritters with staking working
+  // If we couldn't get token IDs from chain, use saved IDs from last session
   if (!tokenIds.length && balance > 0) {
-    console.warn('[Kritter] Using balance-based placeholders for', balance, 'NFTs');
-    // Use saved staked token IDs if we have them, otherwise generate temp IDs
-    const savedIds = state._savedStakedTokenIds || [];
-    if (savedIds.length > 0) {
-      // We know their real token IDs from last session — use those
-      tokenIds = savedIds.slice(0, balance);
-      // Fill remaining with temp IDs if balance grew
-      for (let i = savedIds.length; i < balance; i++) {
-        tokenIds.push(-(i + 1)); // negative = temp placeholder ID
-      }
-    } else {
-      // No saved IDs — generate temp placeholder IDs
-      for (let i = 0; i < balance; i++) {
-        tokenIds.push(-(i + 1));
-      }
+    console.warn('[Kritter] Using saved token IDs for', balance, 'NFTs');
+    const allSaved    = state._savedAllTokenIds    || [];
+    const stakedSaved = state._savedStakedTokenIds || [];
+    // Prefer full saved list, fall back to just staked IDs, then temp IDs
+    const bestSaved = allSaved.length >= balance ? allSaved.slice(0, balance)
+                    : allSaved.length > 0        ? allSaved
+                    : stakedSaved;
+    tokenIds = bestSaved.slice(0, balance);
+    // Fill any gap with temp IDs if balance grew since last session
+    for (let i = tokenIds.length; i < balance; i++) {
+      tokenIds.push(-(i + 1));
     }
   }
 
@@ -1285,6 +1281,7 @@ async function connectWallet(name) {
         state.profile.username  = saved.username        || '';
         state.profile.avatarB64 = saved.avatarB64       || '';
         state._savedStakedTokenIds = saved.stakedTokenIds || [];
+        state._savedAllTokenIds    = saved.allTokenIds    || [];
         if (saved.quests && Array.isArray(saved.quests)) {
           saved.quests.forEach(sq => {
             const q = state.quests.find(q => q.id === sq.id);
@@ -2301,6 +2298,7 @@ window.addEventListener('beforeunload', function() {
         quests:         state.quests,
         username:       state.profile.username,
         avatarB64:      state.profile.avatarB64,
+        allTokenIds:    state.nfts.map(n => n.tokenId),
         stakedTokenIds: state.nfts.filter(n => n.staked).map(n => n.tokenId),
       }
     });
