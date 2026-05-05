@@ -5,6 +5,8 @@
 // etc.
 
 module.exports = async function handler(req, res) {
+  // Global error catch — prevents raw 500s with no body
+  try {
   const url   = process.env.KV_REST_API_URL   || process.env.UPSTASH_REDIS_REST_URL || process.env.STORAGE_URL;
   const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || process.env.STORAGE_TOKEN;
 
@@ -260,7 +262,8 @@ module.exports = async function handler(req, res) {
     // Check password against server-side env var
     const correctPassword = process.env.ADMIN_PASSWORD;
     if (!correctPassword) {
-      return res.status(500).json({ ok: false, error: 'ADMIN_PASSWORD env var not set' });
+      // Env var not set — return 200 with error so frontend can show the message
+      return res.status(200).json({ ok: false, error: 'ADMIN_PASSWORD is not configured in Vercel environment variables. Please add it in your Vercel project settings.' });
     }
     if (password !== correctPassword) {
       return res.status(401).json({ ok: false, error: 'Incorrect password' });
@@ -280,4 +283,9 @@ module.exports = async function handler(req, res) {
   }
 
   return res.status(400).json({ error: 'unknown action: ' + action });
+
+  } catch(err) {
+    console.error('[db.js] Unhandled error for action=' + req.query.action + ':', err);
+    return res.status(500).json({ error: err.message || 'Internal server error' });
+  }
 };
