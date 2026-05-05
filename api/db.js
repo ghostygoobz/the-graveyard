@@ -224,5 +224,60 @@ module.exports = async function handler(req, res) {
     return res.status(200).json(data);
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // PURCHASE LOG
+  // ══════════════════════════════════════════════════════════════════════════
+  if (action === 'purchase-log-save') {
+    if (req.method !== 'POST') return res.status(405).end();
+    const redis = getRedis();
+    if (!redis) return res.status(200).json({ ok: true, note: 'storage not configured' });
+    const { entry } = req.body;
+    if (!entry) return res.status(400).json({ error: 'entry required' });
+    const log = (await redis.get('admin:purchase-log')) || { purchases: [] };
+    log.purchases.push(entry);
+    // Keep last 500 purchases
+    if (log.purchases.length > 500) log.purchases = log.purchases.slice(-500);
+    await redis.set('admin:purchase-log', log);
+    return res.status(200).json({ ok: true });
+  }
+
+  if (action === 'purchase-log-load') {
+    if (req.method !== 'GET') return res.status(405).end();
+    const redis = getRedis();
+    if (!redis) return res.status(200).json({ purchases: [] });
+    const log = (await redis.get('admin:purchase-log')) || { purchases: [] };
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json(log);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ADMIN AUTH — password checked server-side, never exposed in HTML
+  // ══════════════════════════════════════════════════════════════════════════
+  if (action === 'admin-auth') {
+    if (req.method !== 'POST') return res.status(405).end();
+    const { password, wallet } = req.body;
+
+    // Check password against server-side env var
+    const correctPassword = process.env.ADMIN_PASSWORD;
+    if (!correctPassword) {
+      return res.status(500).json({ ok: false, error: 'ADMIN_PASSWORD env var not set' });
+    }
+    if (password !== correctPassword) {
+      return res.status(401).json({ ok: false, error: 'Incorrect password' });
+    }
+
+    // Optional: also check wallet allowlist if ADMIN_WALLETS is set
+    // Set ADMIN_WALLETS in Vercel as comma-separated addresses e.g. "0xabc...,0xdef..."
+    const allowlist = process.env.ADMIN_WALLETS;
+    if (allowlist && wallet) {
+      const allowed = allowlist.split(',').map(w => w.trim().toLowerCase());
+      if (!allowed.includes(wallet.toLowerCase())) {
+        return res.status(403).json({ ok: false, error: 'Wallet not authorised' });
+      }
+    }
+
+    return res.status(200).json({ ok: true });
+  }
+
   return res.status(400).json({ error: 'unknown action: ' + action });
 };
