@@ -1575,7 +1575,7 @@ function totalSKLZ() {
 }
 
 // ══════ SHOP / EMPORIUM ══════
-function buyItem(id) {
+async function buyItem(id) {
   if (!state.connected) { openWalletModal(); return; }
   const item = state.shopItems.find(i => i.id === id);
   if (!item || item.stock <= 0) return;
@@ -1588,8 +1588,8 @@ function buyItem(id) {
   item.stock--;
   const code = generateCode(item.name);
   showCodeModal(code, item.name);
-  // Log purchase with code for admin verification
-  savePurchaseLog({
+  // Log purchase with code for admin verification — await so errors surface
+  await savePurchaseLog({
     code:        code,
     itemName:    item.name,
     itemId:      item.id,
@@ -1602,6 +1602,8 @@ function buyItem(id) {
   scheduleSave();
   saveShopDefinitions(); // immediately persist stock reduction to DB
   updateStats(); renderShop(); renderAdminShop();
+  // Refresh admin purchase log if admin is currently open
+  if (state.adminUnlocked) loadPurchaseLog();
 }
 
 function generateCode(itemName) {
@@ -2088,11 +2090,17 @@ async function loadPurchaseLog() {
 
 async function savePurchaseLog(entry) {
   try {
-    await fetch('/api/db?action=purchase-log-save', {
+    const res = await fetch('/api/db?action=purchase-log-save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ entry })
     });
+    const data = await res.json();
+    if (data.ok) {
+      console.log('[purchaseLog] saved:', entry.code, 'for', entry.itemName);
+    } else {
+      console.warn('[purchaseLog] save returned error:', data);
+    }
   } catch(e) {
     console.warn('[purchaseLog] save failed:', e.message);
   }
