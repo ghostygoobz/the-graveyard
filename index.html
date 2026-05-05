@@ -426,6 +426,21 @@
   .profile-stat .pval { font-family:var(--font-mono);font-size:1.1rem;font-weight:700;color:#c080e8; }
   .profile-stat .plbl { font-family:var(--font-head);font-size:.58rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-top:.1rem; }
 
+  .profile-bio-wrap { margin-top:1.2rem; }
+  .profile-bio-display { font-size:.85rem;color:var(--text);line-height:1.6;font-style:italic;color:rgba(220,210,240,0.8);min-height:1.2rem;cursor:pointer; }
+  .profile-bio-display:empty::before { content:'Click to add a bio…';color:var(--muted);font-style:italic; }
+  .profile-bio-edit { display:none;flex-direction:column;gap:.5rem; }
+  .profile-bio-edit textarea { padding:.6rem .8rem;border-radius:8px;background:rgba(0,0,0,0.4);border:1px solid rgba(155,48,208,0.35);color:var(--text);font-family:var(--font-body);font-size:.85rem;outline:none;width:100%;resize:vertical;min-height:70px;transition:border-color .2s;box-sizing:border-box; }
+  .profile-bio-edit textarea:focus { border-color:var(--accent);box-shadow:0 0 10px rgba(155,48,208,0.2); }
+  .profile-bio-btns { display:flex;gap:.5rem; }
+
+  /* Purchase log in admin */
+  .purchase-log-row { display:flex;align-items:center;gap:.8rem;padding:.6rem .8rem;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;margin-bottom:.4rem;font-size:.75rem;flex-wrap:wrap; }
+  .purchase-log-code { font-family:var(--font-mono);font-weight:700;color:var(--gold);letter-spacing:.05em;flex-shrink:0; }
+  .purchase-log-item { color:var(--bone);flex:1;min-width:120px; }
+  .purchase-log-wallet { font-family:var(--font-mono);color:var(--muted);font-size:.68rem; }
+  .purchase-log-time { color:var(--muted);font-size:.68rem;margin-left:auto; }
+
   .username-edit-wrap { display:none;align-items:center;gap:.6rem;margin-bottom:.5rem; }
   .username-edit-wrap input { padding:.5rem .8rem;border-radius:8px;background:rgba(0,0,0,0.4);border:1px solid rgba(155,48,208,0.35);color:var(--text);font-family:var(--font-head);font-size:.9rem;outline:none;width:220px;transition:border-color .2s; }
   .username-edit-wrap input:focus { border-color:var(--accent);box-shadow:0 0 10px rgba(155,48,208,0.2); }
@@ -504,8 +519,11 @@
     </div>
     <div class="section-title" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem">
       <span style="display:flex;align-items:center;gap:.7rem"><span class="dot"></span> Skul Kritters</span>
-      <span style="font-family:var(--font-mono);font-size:0.62rem;color:var(--muted);background:rgba(155,48,208,0.08);border:1px solid var(--border);border-radius:6px;padding:.3rem .7rem;letter-spacing:.04em">
-        ApeChain &nbsp;·&nbsp; <a href="https://apescan.io/address/0x8817b9c17d5c84b21dEC1E1a9E0de606716807B1" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">0x8817...07B1</a>
+      <span style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+        <span id="stakeCapBadge" style="font-family:var(--font-mono);font-size:.68rem;color:var(--muted);background:rgba(155,48,208,0.08);border:1px solid rgba(155,48,208,0.2);border-radius:6px;padding:.2rem .6rem"></span>
+        <span style="font-family:var(--font-mono);font-size:0.62rem;color:var(--muted);background:rgba(155,48,208,0.08);border:1px solid var(--border);border-radius:6px;padding:.3rem .7rem;letter-spacing:.04em">
+          ApeChain &nbsp;·&nbsp; <a href="https://apescan.io/address/0x8817b9c17d5c84b21dEC1E1a9E0de606716807B1" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">0x8817...07B1</a>
+        </span>
       </span>
     </div>
     <div id="nftLoadingBanner" style="display:none;margin-bottom:1.2rem;padding:.9rem 1.2rem;background:rgba(155,48,208,0.07);border:1px solid var(--border);border-radius:10px;font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:.8rem">
@@ -706,6 +724,7 @@
     <div class="card" style="max-width:480px">
       <div class="section-title" style="font-size:1rem"><span class="dot" style="background:var(--accent2)"></span> Staking Config</div>
       <div class="form-group"><label>SKLZ per NFT per Day</label><input type="number" id="cfgSKLZPerDay" value="10" min="0.01" step="0.01" /></div>
+      <div class="form-group"><label>Max Stakeable NFTs per Wallet <span style="font-weight:400;text-transform:none;letter-spacing:0;font-style:italic">(currently <span id="cfgMaxStakeDisplay">20</span>)</span></label><input type="number" id="cfgMaxStake" value="20" min="1" max="100" step="1" /></div>
       <button class="btn btn-success" style="width:auto;padding:.6rem 1.5rem" onclick="saveConfig()">Apply Config</button>
     </div>
 
@@ -716,6 +735,15 @@
       <div class="section-title" style="font-size:1rem"><span class="dot" style="background:var(--accent2)"></span> Active Stakers <span id="activeStakersCount" style="font-family:var(--font-mono);font-size:.7rem;color:var(--muted);background:rgba(232,135,58,0.1);border:1px solid rgba(232,135,58,0.2);border-radius:4px;padding:.1rem .5rem;margin-left:.4rem"></span></div>
       <p style="font-size:.82rem;color:var(--muted);font-style:italic;margin-bottom:1.2rem">Wallets that currently have Skul Kritters staked. Updates when members stake or unstake.</p>
       <div id="activeStakersList"><div style="font-size:.82rem;color:var(--muted);font-style:italic">Loading…</div></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Purchase Log -->
+    <div class="card" style="margin-bottom:2rem">
+      <div class="section-title" style="font-size:1rem"><span class="dot" style="background:var(--gold)"></span> Purchase Log <span id="purchaseLogCount" style="font-family:var(--font-mono);font-size:.7rem;color:var(--muted);background:rgba(212,175,55,0.1);border:1px solid rgba(212,175,55,0.2);border-radius:4px;padding:.1rem .5rem;margin-left:.4rem"></span></div>
+      <p style="font-size:.82rem;color:var(--muted);font-style:italic;margin-bottom:1.2rem">Every redemption code issued in the Emporium. Use this to verify purchases before fulfilling rewards.</p>
+      <div id="purchaseLogList"><div style="font-size:.82rem;color:var(--muted);font-style:italic">Loading…</div></div>
     </div>
 
     <div class="divider"></div>
@@ -766,6 +794,16 @@
           <button class="cancel-username-btn" onclick="cancelEditUsername()">Cancel</button>
         </div>
         <div class="profile-addr" id="profileAddrDisplay"></div>
+        <div class="profile-bio-wrap">
+          <div class="profile-bio-display" id="profileBioDisplay" onclick="startEditBio()"></div>
+          <div class="profile-bio-edit" id="profileBioEdit">
+            <textarea id="profileBioInput" placeholder="Tell the community about yourself… (max 200 chars)" maxlength="200"></textarea>
+            <div class="profile-bio-btns">
+              <button class="save-username-btn" onclick="saveBio()">Save Bio</button>
+              <button class="cancel-username-btn" onclick="cancelEditBio()">Cancel</button>
+            </div>
+          </div>
+        </div>
         <div class="profile-stats-row">
           <div class="profile-stat"><div class="pval" id="profileXP">0</div><div class="plbl">XP</div></div>
           <div class="profile-stat"><div class="pval" id="profileQuests">0</div><div class="plbl">Quests</div></div>
@@ -810,18 +848,18 @@
 
 <script>
 // ══════ ADMIN PASSWORD — change this to your secret ══════
-const ADMIN_PASSWORD = 'graveyard2024';
+// Admin password is checked server-side — not stored in HTML
 
 // ══════ STATE ══════
 let state = {
   connected: false, wallet: null, address: null,
-  profile: { username: '', avatarB64: '' },
+  profile: { username: '', avatarB64: '', bio: '' },
   pendingRewards: 0, totalEarned: 0, myXP: 0, myQuestsDone: 0, questSKLZ: 0,
   editingQuestId: null, editingShopId: null,
   adminUnlocked: false,
   pendingAdminNav: null,
   currentShopImageB64: null,
-  config: { sklzPerDay: 10 },
+  config: { sklzPerDay: 10, maxStake: 20 },
   nfts: [],
   nftLoading: false,
   linkSubmissions: [], // {id, questId, walletAddr, url, status:'pending'|'approved'|'rejected', submittedAt}
@@ -864,18 +902,32 @@ function requestAdminAccess(e) {
   setTimeout(() => document.getElementById('adminPwInput').focus(), 100);
 }
 
-function checkAdminPassword() {
+async function checkAdminPassword() {
   const pw = document.getElementById('adminPwInput').value;
-  if (pw === ADMIN_PASSWORD) {
-    state.adminUnlocked = true;
-    document.getElementById('adminGate').style.display = 'none';
-    performShowPage('admin', state.pendingAdminNav);
-    loadBonusHistory();
-    loadActiveStakers();
-  } else {
-    document.getElementById('gateError').textContent = 'Incorrect password. Try again.';
-    document.getElementById('adminPwInput').value = '';
-    document.getElementById('adminPwInput').focus();
+  if (!pw) return;
+  document.getElementById('gateError').textContent = 'Checking…';
+  try {
+    const res = await fetch('/api/db?action=admin-auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw, wallet: state.fullAddress || '' })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      state.adminUnlocked = true;
+      document.getElementById('adminGate').style.display = 'none';
+      document.getElementById('gateError').textContent = '';
+      performShowPage('admin', state.pendingAdminNav);
+      loadBonusHistory();
+      loadActiveStakers();
+      loadPurchaseLog();
+    } else {
+      document.getElementById('gateError').textContent = data.error || 'Incorrect password. Try again.';
+      document.getElementById('adminPwInput').value = '';
+      document.getElementById('adminPwInput').focus();
+    }
+  } catch(e) {
+    document.getElementById('gateError').textContent = 'Could not verify — try again.';
   }
 }
 
@@ -929,6 +981,7 @@ async function persistProgress() {
           quests:         state.quests,
           username:       state.profile.username,
           avatarB64:      state.profile.avatarB64,
+          bio:            state.profile.bio,
           // Save all token IDs and which are staked so they restore on reconnect
           allTokenIds:    state.nfts.map(n => n.tokenId),
           stakedTokenIds: state.nfts.filter(n => n.staked).map(n => n.tokenId),
@@ -1086,7 +1139,16 @@ async function loadQuestDefinitions() {
         linkStatus:  (userProgress[q.id] && userProgress[q.id].linkStatus)  ?? null,
         submittedLink: (userProgress[q.id] && userProgress[q.id].submittedLink) ?? null,
       }));
-      if (data.config) state.config = { ...state.config, ...data.config };
+      if (data.config) {
+        state.config = { ...state.config, ...data.config };
+        // Update admin config fields if they're visible
+        const cfgSKLZ = document.getElementById('cfgSKLZPerDay');
+        const cfgMax  = document.getElementById('cfgMaxStake');
+        const cfgDisp = document.getElementById('cfgMaxStakeDisplay');
+        if (cfgSKLZ) cfgSKLZ.value = state.config.sklzPerDay;
+        if (cfgMax)  cfgMax.value  = state.config.maxStake || 20;
+        if (cfgDisp) cfgDisp.textContent = state.config.maxStake || 20;
+      }
       state.nextQuestId = Math.max(...state.quests.map(q => q.id)) + 1;
       renderQuests();
       renderAdminQuests();
@@ -1293,6 +1355,7 @@ async function connectWallet(name) {
         }
         state.profile.username  = saved.username        || '';
         state.profile.avatarB64 = saved.avatarB64       || '';
+        state.profile.bio       = saved.bio              || '';
         state._savedStakedTokenIds = saved.stakedTokenIds || [];
         state._savedAllTokenIds    = saved.allTokenIds    || [];
         if (saved.quests && Array.isArray(saved.quests)) {
@@ -1417,7 +1480,16 @@ function startRewardAccumulation() {
 // ══════ STAKING ══════
 function toggleStake(idx) {
   if (!state.connected) { openWalletModal(); return; }
-  const nft = state.nfts[idx];
+  const nft    = state.nfts[idx];
+  const max    = state.config.maxStake || 20;
+  const currentlyStaked = state.nfts.filter(n => n.staked).length;
+
+  // Enforce cap — only block staking, not unstaking
+  if (!nft.staked && currentlyStaked >= max) {
+    toast('⚠ Max ' + max + ' Kritters can be staked per wallet. Unstake one first.');
+    return;
+  }
+
   nft.staked = !nft.staked;
   toast(nft.staked ? '✅ ' + nft.name + ' staked!' : '↩ ' + nft.name + ' unstaked');
   const staked = state.nfts.filter(n=>n.staked).length;
@@ -1516,6 +1588,17 @@ function buyItem(id) {
   item.stock--;
   const code = generateCode(item.name);
   showCodeModal(code, item.name);
+  // Log purchase with code for admin verification
+  savePurchaseLog({
+    code:        code,
+    itemName:    item.name,
+    itemId:      item.id,
+    wallet:      state.fullAddress  || '',
+    shortAddr:   state.address      || '',
+    username:    state.profile.username || '',
+    price:       item.price,
+    purchasedAt: new Date().toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }),
+  });
   scheduleSave();
   saveShopDefinitions(); // immediately persist stock reduction to DB
   updateStats(); renderShop(); renderAdminShop();
@@ -1551,6 +1634,14 @@ function updateStats() {
   document.getElementById('stakedCount').textContent = staked;
   document.getElementById('totalEarned').textContent = state.totalEarned.toFixed(2);
   document.getElementById('dailyYield').textContent = (staked * state.config.sklzPerDay).toFixed(2) + ' SKLZ';
+  const capBadge = document.getElementById('stakeCapBadge');
+  if (capBadge) {
+    const max = state.config.maxStake || 20;
+    capBadge.textContent = staked + ' / ' + max + ' staked';
+    capBadge.style.color = staked >= max ? '#e8873a' : 'var(--muted)';
+    capBadge.style.borderColor = staked >= max ? 'rgba(232,135,58,0.4)' : 'rgba(155,48,208,0.2)';
+    capBadge.style.background  = staked >= max ? 'rgba(232,135,58,0.1)' : 'rgba(155,48,208,0.1)';
+  }
   document.getElementById('myXP').textContent = state.myXP.toLocaleString();
   document.getElementById('myQuestsDone').textContent = state.myQuestsDone;
   document.getElementById('questRewards').textContent = state.questSKLZ.toLocaleString();
@@ -1916,7 +2007,11 @@ function renderAdminShop() {
 
 function saveConfig() {
   state.config.sklzPerDay = parseFloat(document.getElementById('cfgSKLZPerDay').value) || 10;
-  toast('✅ Config saved!'); updateStats();
+  state.config.maxStake   = parseInt(document.getElementById('cfgMaxStake').value)   || 20;
+  const dispEl = document.getElementById('cfgMaxStakeDisplay');
+  if (dispEl) dispEl.textContent = state.config.maxStake;
+  toast('✅ Config saved! Max stake is now ' + state.config.maxStake + ' NFTs per wallet.');
+  updateStats();
   saveQuestDefinitions();
 }
 
@@ -1927,6 +2022,80 @@ function toast(msg) {
   el.textContent = msg; el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(()=>el.classList.remove('show'), 3000);
+}
+
+// ══════ BIO ══════
+function startEditBio() {
+  const bioDisplay = document.getElementById('profileBioDisplay');
+  const bioEdit    = document.getElementById('profileBioEdit');
+  const bioInput   = document.getElementById('profileBioInput');
+  if (!bioDisplay || !bioEdit || !bioInput) return;
+  bioDisplay.style.display = 'none';
+  bioEdit.style.display    = 'flex';
+  bioInput.value = state.profile.bio || '';
+  bioInput.focus();
+}
+
+function cancelEditBio() {
+  const bioDisplay = document.getElementById('profileBioDisplay');
+  const bioEdit    = document.getElementById('profileBioEdit');
+  if (!bioDisplay || !bioEdit) return;
+  bioDisplay.style.display = '';
+  bioEdit.style.display    = 'none';
+}
+
+function saveBio() {
+  const bioInput = document.getElementById('profileBioInput');
+  if (!bioInput) return;
+  state.profile.bio = bioInput.value.trim().slice(0, 200);
+  cancelEditBio();
+  renderProfile();
+  persistProgress();
+  toast('✅ Bio saved!');
+}
+
+// ══════ PURCHASE LOG ══════
+async function loadPurchaseLog() {
+  try {
+    const res = await fetch('/api/db?action=purchase-log-load');
+    if (!res.ok) return;
+    const data = await res.json();
+    const el = document.getElementById('purchaseLogList');
+    const countEl = document.getElementById('purchaseLogCount');
+    if (!el) return;
+    const logs = data && data.purchases ? data.purchases : [];
+    if (countEl) countEl.textContent = logs.length + ' total';
+    if (!logs.length) {
+      el.innerHTML = '<div style="font-size:.82rem;color:var(--muted);font-style:italic">No purchases yet.</div>';
+      return;
+    }
+    // Show newest first
+    el.innerHTML = logs.slice().reverse().map(p =>
+      '<div class="purchase-log-row">' +
+        '<div class="purchase-log-code">' + p.code + '</div>' +
+        '<div class="purchase-log-item">' + p.itemName + '</div>' +
+        '<div style="flex:2;min-width:140px">' +
+          '<div class="purchase-log-wallet">' + (p.username ? p.username + ' · ' : '') + p.shortAddr + '</div>' +
+          '<div class="purchase-log-wallet">' + p.wallet + '</div>' +
+        '</div>' +
+        '<div class="purchase-log-time">' + p.purchasedAt + '</div>' +
+      '</div>'
+    ).join('');
+  } catch(e) {
+    console.warn('[purchaseLog] load failed:', e.message);
+  }
+}
+
+async function savePurchaseLog(entry) {
+  try {
+    await fetch('/api/db?action=purchase-log-save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entry })
+    });
+  } catch(e) {
+    console.warn('[purchaseLog] save failed:', e.message);
+  }
 }
 
 // ══════ ACTIVE STAKER REGISTRY ══════
@@ -2199,6 +2368,10 @@ function renderProfile() {
     }
   }
   if (addrDisplay)   addrDisplay.textContent   = state.address || '';
+
+  // Bio
+  const bioDisplay = document.getElementById('profileBioDisplay');
+  if (bioDisplay) bioDisplay.textContent = state.profile.bio || '';
   if (profileXP)     profileXP.textContent     = state.myXP.toLocaleString();
   if (profileQuests) profileQuests.textContent = state.myQuestsDone;
   if (profileSKLZ)   profileSKLZ.textContent   = Math.floor(totalSKLZ()).toLocaleString();
@@ -2320,6 +2493,7 @@ window.addEventListener('beforeunload', function() {
         quests:         state.quests,
         username:       state.profile.username,
         avatarB64:      state.profile.avatarB64,
+        bio:            state.profile.bio,
         allTokenIds:    state.nfts.map(n => n.tokenId),
         stakedTokenIds: state.nfts.filter(n => n.staked).map(n => n.tokenId),
       }
