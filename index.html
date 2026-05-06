@@ -873,15 +873,7 @@ let state = {
     { id:6, title:'Claim Rewards', desc:'Claim your SKLZ staking rewards at least once.', icon:'💰', type:'daily', xp:80, sklz:0, goal:1, progress:0, claimed:false, repeatable:false, noTimer:false, lastClaimed:null, claimCount:0 },
   ],
   shopItems: [],
-  leaderboard: [
-    { addr:'0x1a2b...9c0d', emoji:'🦁', name:'CryptoLion', xp:4200, quests:18 },
-    { addr:'0x3e4f...1a2b', emoji:'🐉', name:'VoidDragon', xp:3800, quests:15 },
-    { addr:'0x5c6d...3e4f', emoji:'🦅', name:'GraveyardEagle', xp:3200, quests:13 },
-    { addr:'0x7a8b...5c6d', emoji:'🐺', name:'StormWolf', xp:2700, quests:11 },
-    { addr:'0x9e0f...7a8b', emoji:'🦊', name:'CipherFox', xp:2100, quests:9 },
-    { addr:'0xab12...9e0f', emoji:'🐯', name:'IronTiger', xp:1500, quests:7 },
-    { addr:'0xcd34...ab12', emoji:'🦚', name:'CrystalPeacock', xp:900, quests:4 },
-  ],
+  leaderboard: [],
   nextQuestId: 7,
   nextShopId: 1,
   rewardInterval: null,
@@ -938,6 +930,8 @@ function cancelAdminGate() {
 
 // ══════ NAVIGATION ══════
 function showPage(name, e) {
+  // Always fetch fresh leaderboard when user navigates to that tab
+  if (name === 'leaderboard') loadLeaderboard();
   if (name === 'admin') { requestAdminAccess(e); return; }
   performShowPage(name, e);
 }
@@ -1009,23 +1003,21 @@ async function loadLeaderboard() {
     const res = await fetch('/api/db?action=leaderboard');
     if (!res.ok) return;
     const data = await res.json();
-    if (data.players && data.players.length) {
-      // Replace demo leaderboard with real data, preserving current user's entry
-      state.leaderboard = data.players
-        .filter(p => p.addr !== (state.fullAddress || '').toLowerCase())
-        .map(p => ({
-          addr:      p.shortAddr,
-          fullAddr:  p.addr,
-          name:      p.username || p.shortAddr,
-          avatarB64: p.avatarB64 || '',
-          emoji:     '💀',
-          xp:        p.xp,
-          quests:    p.quests,
-        }));
+    if (data.players) {
+      // Store all real players — shown to everyone, wallet connected or not
+      state.leaderboard = data.players.map(p => ({
+        addr:      p.shortAddr,
+        fullAddr:  p.addr,
+        name:      p.username || p.shortAddr,
+        avatarB64: p.avatarB64 || '',
+        emoji:     '💀',
+        xp:        p.xp,
+        quests:    p.quests,
+      }));
       renderLeaderboard();
     }
   } catch(e) {
-    console.warn('[persist] leaderboard load failed:', e.message);
+    console.warn('[leaderboard] load failed:', e.message);
   }
 }
 
@@ -2510,10 +2502,11 @@ window.addEventListener('beforeunload', function() {
   }
 });
 
-// Load quest, shop and submissions from DB on startup
+// Load quest, shop, submissions and leaderboard on startup (no wallet needed)
 loadQuestDefinitions();
 loadShopDefinitions();
 loadSubmissions();
+loadLeaderboard();
 
 // ══════ SPOOKY MIST ══════
 (function spawnMist() {
