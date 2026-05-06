@@ -1089,11 +1089,25 @@ async function loadShopDefinitions() {
 // ── Save quest definitions (called after any admin quest/config change) ──
 async function saveQuestDefinitions() {
   try {
+    // Strip ALL per-user fields before saving quest definitions
+    // linkStatus, submittedLink, progress, claimed etc. are per-user — never global
+    const cleanQuests = state.quests.map(q => ({
+      id:           q.id,
+      title:        q.title,
+      description:  q.description,
+      type:         q.type,
+      goal:         q.goal,
+      xp:           q.xp,
+      sklz:         q.sklz,
+      repeatable:   q.repeatable,
+      requiresLink: q.requiresLink,
+      noTimer:      q.noTimer,
+    }));
     await fetch('/api/db?action=quests-save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        quests: state.quests,
+        quests: cleanQuests,
         config: state.config,
       })
     });
@@ -1122,14 +1136,27 @@ async function loadQuestDefinitions() {
         };
       });
       state.quests = data.quests.map(q => ({
-        ...q,
-        // Restore this user's progress on top of the saved definition
-        progress:    (userProgress[q.id] && userProgress[q.id].progress)    ?? 0,
-        claimed:     (userProgress[q.id] && userProgress[q.id].claimed)     ?? false,
-        lastClaimed: (userProgress[q.id] && userProgress[q.id].lastClaimed) ?? null,
-        claimCount:  (userProgress[q.id] && userProgress[q.id].claimCount)  ?? 0,
-        linkStatus:  (userProgress[q.id] && userProgress[q.id].linkStatus)  ?? null,
-        submittedLink: (userProgress[q.id] && userProgress[q.id].submittedLink) ?? null,
+        // Quest definition fields only — no per-user state from the definition
+        id:           q.id,
+        title:        q.title,
+        description:  q.description,
+        type:         q.type,
+        goal:         q.goal,
+        xp:           q.xp,
+        sklz:         q.sklz,
+        repeatable:   q.repeatable   || false,
+        requiresLink: q.requiresLink || false,
+        noTimer:      q.noTimer      || false,
+        // Per-user progress — from userProgress snapshot only, never from quest def
+        progress:     (userProgress[q.id] ? userProgress[q.id].progress    : null) ?? 0,
+        claimed:      (userProgress[q.id] ? userProgress[q.id].claimed     : null) ?? false,
+        lastClaimed:  (userProgress[q.id] ? userProgress[q.id].lastClaimed : null) ?? null,
+        claimCount:   (userProgress[q.id] ? userProgress[q.id].claimCount  : null) ?? 0,
+        // linkStatus and submittedLink come ONLY from the user's own progress record
+        // never from quest definitions — so they are always null here
+        // and get properly restored when loadProgress runs after wallet connect
+        linkStatus:    null,
+        submittedLink: null,
       }));
       if (data.config) {
         state.config = { ...state.config, ...data.config };
@@ -1354,12 +1381,15 @@ async function connectWallet(name) {
           saved.quests.forEach(sq => {
             const q = state.quests.find(q => q.id === sq.id);
             if (q) {
-              q.progress      = sq.progress      ?? q.progress;
-              q.claimed       = sq.claimed       ?? q.claimed;
-              q.lastClaimed   = sq.lastClaimed   ?? q.lastClaimed;
-              q.claimCount    = sq.claimCount    ?? q.claimCount;
-              q.linkStatus    = sq.linkStatus    ?? q.linkStatus;
-              q.submittedLink = sq.submittedLink ?? q.submittedLink;
+              // Always restore user's saved values — direct assignment, no fallback
+              // This ensures approved/rejected/pending state is always correct
+              if (sq.progress    !== undefined) q.progress      = sq.progress;
+              if (sq.claimed     !== undefined) q.claimed       = sq.claimed;
+              if (sq.lastClaimed !== undefined) q.lastClaimed   = sq.lastClaimed;
+              if (sq.claimCount  !== undefined) q.claimCount    = sq.claimCount;
+              // linkStatus: use saved value directly — null means cleared (approved+claimed or rejected)
+              q.linkStatus    = sq.linkStatus    !== undefined ? sq.linkStatus    : null;
+              q.submittedLink = sq.submittedLink !== undefined ? sq.submittedLink : null;
             }
           });
         }
