@@ -1526,14 +1526,17 @@ function claimQuest(id) {
   toast('🎉 Quest complete! +' + q.xp + ' XP  +' + q.sklz + ' SKLZ');
   if (state.myQuestsDone >= 5) autoProgress(5, state.myQuestsDone);
   if (q.repeatable) {
-    // Reset for next round
-    q.progress = 0;
-    q.lastClaimed = Date.now();
-    q.claimCount = (q.claimCount || 0) + 1;
-    q.linkStatus = null;
+    // Reset for next round — clear link so they can submit again next cycle
+    q.progress      = 0;
+    q.lastClaimed   = Date.now();
+    q.claimCount    = (q.claimCount || 0) + 1;
+    q.linkStatus    = null;
     q.submittedLink = null;
   } else {
-    q.claimed = true;
+    q.claimed       = true;
+    // Always clear linkStatus on claim so it doesn't persist as stale
+    q.linkStatus    = null;
+    q.submittedLink = null;
   }
   updateStats(); renderQuests();
   scheduleSave();
@@ -2238,12 +2241,13 @@ function submitQuestLink(questId) {
 
   // Add new submission
   state.linkSubmissions.push({
-    id: state.nextSubmissionId++,
-    questId,
-    questTitle: q.title,
-    walletAddr: state.address,
+    id:          state.nextSubmissionId++,
+    questId:     questId,
+    questTitle:  q.title,
+    wallet:      state.fullAddress || '',
+    walletAddr:  state.address     || '',
     url,
-    status: 'pending',
+    status:      'pending',
     submittedAt: new Date().toLocaleString('en-US', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})
   });
 
@@ -2296,7 +2300,7 @@ function renderLinkReview() {
   }).join('');
 }
 
-function reviewLink(submissionId, decision) {
+async function reviewLink(submissionId, decision) {
   const sub = state.linkSubmissions.find(s => s.id === submissionId);
   if (!sub) return;
   sub.status = decision;
@@ -2305,17 +2309,52 @@ function reviewLink(submissionId, decision) {
   if (q) {
     q.linkStatus = decision;
     if (decision === 'approved') {
-      // Auto-complete the quest progress so the user can claim
       q.progress = q.goal;
       toast('✅ Link approved — user can now claim their rewards.');
     } else {
-      toast('❌ Link rejected — user will be prompted to resubmit.');
+      // Rejected — clear linkStatus so user can resubmit
+      q.linkStatus = null;
+      q.submittedLink = null;
+      toast('❌ Link rejected — user can now resubmit a new link.');
     }
   }
   renderLinkReview();
   renderQuests();
   scheduleSave();
   saveSubmissions();
+
+  // ── Push the approval/rejection directly to the user's DB record ──────────
+  // This ensures the user sees the correct status when they refresh
+  const reviewWallet = sub.wallet || sub.walletAddr || '';
+  if (reviewWallet) {
+    try {
+      const res = await fetch('/api/db?action=progress-load&wallet=' + encodeURIComponent(reviewWallet));
+      if (res.ok) {
+        const saved = await res.json();
+        if (saved && saved.quests && Array.isArray(saved.quests)) {
+          const savedQ = saved.quests.find(sq => sq.id === sub.questId);
+          if (savedQ) {
+            if (decision === 'approved') {
+              savedQ.linkStatus = 'approved';
+              savedQ.progress   = savedQ.goal || q.goal;
+            } else {
+              // Rejected — clear so they can resubmit
+              savedQ.linkStatus    = null;
+              savedQ.submittedLink = null;
+            }
+            await fetch('/api/db?action=progress-save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ wallet: reviewWallet, data: { quests: saved.quests } })
+            });
+            console.log('[review] Pushed ' + decision + ' to ' + reviewWallet + ' quest ' + sub.questId);
+          }
+        }
+      }
+    } catch(e) {
+      console.warn('[review] Could not push decision to user DB:', e.message);
+    }
+  }
 }
 
 // ══════ PROFILE ══════
