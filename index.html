@@ -1111,14 +1111,17 @@ async function saveQuestDefinitions() {
     const cleanQuests = state.quests.map(q => ({
       id:           q.id,
       title:        q.title,
+      desc:         q.desc,
       description:  q.description,
+      icon:         q.icon        || '📜',
+      linkLabel:    q.linkLabel   || '',
       type:         q.type,
       goal:         q.goal,
       xp:           q.xp,
       sklz:         q.sklz,
-      repeatable:   q.repeatable,
-      requiresLink: q.requiresLink,
-      noTimer:      q.noTimer,
+      repeatable:   q.repeatable  || false,
+      requiresLink: q.requiresLink|| false,
+      noTimer:      q.noTimer     || false,
     }));
     await fetch('/api/db?action=quests-save', {
       method: 'POST',
@@ -1156,7 +1159,10 @@ async function loadQuestDefinitions() {
         // Quest definition fields only — no per-user state from the definition
         id:           q.id,
         title:        q.title,
-        description:  q.description,
+        desc:         q.desc         || q.description || '',
+        description:  q.description  || q.desc        || '',
+        icon:         q.icon         || '📜',
+        linkLabel:    q.linkLabel    || '',
         type:         q.type,
         goal:         q.goal,
         xp:           q.xp,
@@ -1794,7 +1800,7 @@ function renderQuests() {
       const noTimerNote = (q.repeatable && q.noTimer && !waitingApproval && (q.claimCount||0) > 0) ? `
         <div style="font-size:.68rem;color:var(--muted);font-style:italic;margin-top:.3rem">🔄 Completed ${q.claimCount}× — no cooldown</div>` : '';
       return `<div class="quest-card ${fullyDone?'completed':''} ${onCooldown?'on-cooldown':''}">
-        <div class="quest-icon">${q.icon}</div>
+        <div class="quest-icon">${q.icon || '📜'}</div>
         <div class="quest-body" style="flex:1">
           <div class="quest-title">${q.title}${fullyDone?' ✅':''}${q.repeatable?' <span style="font-size:.6rem;color:#c080e8;font-family:var(--font-head);letter-spacing:.08em;background:rgba(155,48,208,.1);border:1px solid rgba(155,48,208,.25);border-radius:3px;padding:.1rem .4rem;text-transform:uppercase">Repeatable</span>':''}</div>
           <div class="quest-desc">${q.desc}</div>
