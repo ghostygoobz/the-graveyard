@@ -2324,10 +2324,53 @@ function renderLinkReview() {
         <button class="btn-approve" onclick="reviewLink(${s.id},'approved')">✅ Approve</button>
         <button class="btn-reject"  onclick="reviewLink(${s.id},'rejected')">❌ Reject</button>
       </div>` : isApproved
-        ? '<div style="font-size:.72rem;color:var(--accent2);font-style:italic">Points granted to user ✓</div>'
-        : '<div style="font-size:.72rem;color:#e05555;font-style:italic">Submission rejected</div>'}
+        ? `<div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+            <div style="font-size:.72rem;color:var(--accent2);font-style:italic">Points granted to user ✓</div>
+            <button style="font-size:.62rem;padding:.2rem .6rem;border-radius:5px;border:1px solid rgba(155,48,208,0.3);background:rgba(155,48,208,0.08);color:var(--muted);cursor:pointer" onclick="forceClearLinkStatus(${s.id})">🔄 Force Clear</button>
+          </div>`
+        : `<div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+            <div style="font-size:.72rem;color:#e05555;font-style:italic">Submission rejected</div>
+            <button style="font-size:.62rem;padding:.2rem .6rem;border-radius:5px;border:1px solid rgba(155,48,208,0.3);background:rgba(155,48,208,0.08);color:var(--muted);cursor:pointer" onclick="forceClearLinkStatus(${s.id})">🔄 Force Clear</button>
+          </div>`}
     </div>`;
   }).join('');
+}
+
+async function forceClearLinkStatus(submissionId) {
+  const sub = state.linkSubmissions.find(s => s.id === submissionId);
+  if (!sub) return;
+  const wallet = sub.wallet || sub.walletAddr || '';
+  if (!wallet) { toast('⚠ No wallet address on this submission'); return; }
+
+  toast('🔄 Clearing link status for ' + (sub.walletAddr || wallet) + '…');
+  try {
+    const res = await fetch('/api/db?action=progress-load&wallet=' + encodeURIComponent(wallet));
+    if (!res.ok) { toast('❌ Could not load user record'); return; }
+    const saved = await res.json();
+    if (!saved) { toast('❌ No saved record found for this wallet'); return; }
+
+    // Clear linkStatus and submittedLink for this specific quest
+    if (saved.quests && Array.isArray(saved.quests)) {
+      saved.quests.forEach(sq => {
+        if (sq.id === sub.questId) {
+          sq.linkStatus    = null;
+          sq.submittedLink = null;
+        }
+      });
+    }
+
+    await fetch('/api/db?action=progress-save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallet, data: { quests: saved.quests } })
+    });
+
+    toast('✅ Link status cleared — user can now resubmit');
+    console.log('[forceClear] Cleared linkStatus for', wallet, 'quest', sub.questId);
+  } catch(e) {
+    toast('❌ Failed: ' + e.message);
+    console.warn('[forceClear] error:', e);
+  }
 }
 
 async function reviewLink(submissionId, decision) {
