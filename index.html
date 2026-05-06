@@ -1592,7 +1592,9 @@ function claimQuest(id) {
     q.submittedLink = null;
   }
   updateStats(); renderQuests();
-  scheduleSave();
+  persistProgress(); // save immediately — updates XP in DB and leaderboard sorted set
+  // Refresh leaderboard so new XP shows up right away
+  setTimeout(loadLeaderboard, 1500);
 }
 
 function isOnCooldown(q) {
@@ -2474,7 +2476,7 @@ async function reviewLink(submissionId, decision) {
     q.linkStatus = decision;
     if (decision === 'approved') {
       q.progress = q.goal;
-      toast('✅ Link approved — user can now claim their rewards.');
+      toast('✅ Link approved — ask the user to refresh and click Claim to receive their XP and SKLZ.');
     } else {
       // Rejected — clear linkStatus so user can resubmit
       q.linkStatus = null;
