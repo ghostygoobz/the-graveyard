@@ -748,6 +748,23 @@
 
     <div class="divider"></div>
 
+    <!-- Wallet Debug Tool -->
+    <div class="card" style="margin-bottom:2rem">
+      <div class="section-title" style="font-size:1rem"><span class="dot" style="background:#e05555"></span> Wallet Debug Tool</div>
+      <p style="font-size:.82rem;color:var(--muted);font-style:italic;margin-bottom:1.2rem">Look up any wallet's saved data and fix stuck quest states.</p>
+      <div class="form-group">
+        <label>Wallet Address</label>
+        <input type="text" id="debugWallet" placeholder="0x..." style="font-family:var(--font-mono);font-size:.8rem" />
+      </div>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem">
+        <button class="btn btn-success" style="width:auto;padding:.5rem 1.2rem;font-size:.72rem" onclick="debugLoadWallet()">🔍 Load Wallet Data</button>
+        <button class="btn" style="width:auto;padding:.5rem 1.2rem;font-size:.72rem;background:rgba(224,85,85,0.15);border-color:rgba(224,85,85,0.4);color:#e05555" onclick="debugClearAllLinkStatus()">🔄 Clear All Link Statuses</button>
+      </div>
+      <div id="debugOutput" style="font-family:var(--font-mono);font-size:.72rem;color:var(--muted);background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:8px;padding:1rem;min-height:60px;white-space:pre-wrap;word-break:break-all;display:none"></div>
+    </div>
+
+    <div class="divider"></div>
+
     <!-- Bonus SKLZ -->
     <div class="card" style="max-width:480px">
       <div class="section-title" style="font-size:1rem"><span class="dot" style="background:var(--gold)"></span> Grant Bonus SKLZ</div>
@@ -2185,6 +2202,74 @@ async function loadActiveStakers() {
     ).join('');
   } catch(e) {
     console.warn('[stakers] load failed:', e.message);
+  }
+}
+
+// ══════ WALLET DEBUG TOOL ══════
+async function debugLoadWallet() {
+  const wallet = document.getElementById('debugWallet').value.trim();
+  if (!wallet) { toast('⚠ Enter a wallet address'); return; }
+  const out = document.getElementById('debugOutput');
+  out.style.display = 'block';
+  out.textContent = 'Loading…';
+  try {
+    const res = await fetch('/api/db?action=progress-load&wallet=' + encodeURIComponent(wallet));
+    const data = await res.json();
+    if (!data) {
+      out.textContent = 'No record found for this wallet.';
+      return;
+    }
+    // Show quest link statuses clearly
+    const nl = String.fromCharCode(10);
+    const questSummary = (data.quests || []).map(q =>
+      'Quest ' + q.id + ': linkStatus=' + JSON.stringify(q.linkStatus) +
+      ' submittedLink=' + JSON.stringify(q.submittedLink) +
+      ' progress=' + q.progress + '/' + (q.goal||'?') +
+      ' claimed=' + q.claimed
+    ).join(nl);
+    out.textContent =
+      'Wallet: ' + wallet + nl +
+      'XP: ' + (data.myXP||0) + '  SKLZ: ' + ((data.questSKLZ||0)+(data.totalEarned||0)).toFixed(2) + nl +
+      'Pending Rewards: ' + (data.pendingRewards||0).toFixed(4) + nl + nl +
+      'QUESTS:' + nl + (questSummary || 'none saved');
+  } catch(e) {
+    out.textContent = 'Error: ' + e.message;
+  }
+}
+
+async function debugClearAllLinkStatus() {
+  const wallet = document.getElementById('debugWallet').value.trim();
+  if (!wallet) { toast('⚠ Enter a wallet address first, then click Load to verify'); return; }
+  const out = document.getElementById('debugOutput');
+  out.style.display = 'block';
+  out.textContent = 'Clearing link statuses…';
+  try {
+    const res = await fetch('/api/db?action=progress-load&wallet=' + encodeURIComponent(wallet));
+    const data = await res.json();
+    if (!data) { out.textContent = 'No record found for this wallet.'; return; }
+
+    let cleared = 0;
+    if (data.quests && Array.isArray(data.quests)) {
+      data.quests.forEach(q => {
+        if (q.linkStatus !== null && q.linkStatus !== undefined) {
+          q.linkStatus    = null;
+          q.submittedLink = null;
+          cleared++;
+        }
+      });
+    }
+
+    await fetch('/api/db?action=progress-save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallet, data: { quests: data.quests } })
+    });
+
+    out.textContent = '✅ Cleared ' + cleared + ' link status(es) for ' + wallet + String.fromCharCode(10) + 'User can now refresh and resubmit links.';
+    toast('✅ Cleared ' + cleared + ' link status(es) — user can now refresh');
+  } catch(e) {
+    out.textContent = 'Error: ' + e.message;
+    toast('❌ Failed: ' + e.message);
   }
 }
 
