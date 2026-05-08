@@ -755,6 +755,8 @@
       <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1.2rem">
         <button class="btn" style="width:auto;padding:.5rem 1.2rem;font-size:.72rem;background:rgba(212,160,23,0.1);border-color:rgba(212,160,23,0.4);color:var(--gold)" onclick="debugCheckQuestDefs()">🔍 Check Quest Definitions</button>
         <button class="btn btn-success" style="width:auto;padding:.5rem 1.2rem;font-size:.72rem" onclick="debugFixQuestDefs()">🛠 Fix Quest Definitions</button>
+        <button class="btn" style="width:auto;padding:.5rem 1.2rem;font-size:.72rem;background:rgba(155,48,208,0.1);border-color:rgba(155,48,208,0.4);color:#c080e8" onclick="debugScanAllWallets()">🔎 Scan All Wallets</button>
+        <button class="btn" style="width:auto;padding:.5rem 1.2rem;font-size:.72rem;background:rgba(224,85,85,0.15);border-color:rgba(224,85,85,0.4);color:#e05555" onclick="debugFixAllWallets()">⚡ Auto-Fix All Stuck</button>
       </div>
       <div class="form-group" style="margin-top:.8rem">
         <label>Wallet Address — for clearing a specific member's stuck link status</label>
@@ -2311,6 +2313,129 @@ async function debugPatchQuestStatus(wallet, questId, status) {
     toast('✅ Quest ' + questId + ' patched for ' + wallet.slice(0,8) + '…');
   } catch(e) {
     out.textContent = 'Error: ' + e.message;
+  }
+}
+
+async function debugScanAllWallets() {
+  const out = document.getElementById('debugOutput');
+  out.style.display = 'block';
+  out.textContent = 'Fetching all staker wallets…';
+  const nl = String.fromCharCode(10);
+  try {
+    // Get all known wallets from stakers list + leaderboard
+    const [stakersRes, lbRes] = await Promise.all([
+      fetch('/api/db?action=stakers-list'),
+      fetch('/api/db?action=leaderboard'),
+    ]);
+    const stakersData = await stakersRes.json();
+    const lbData      = await lbRes.json();
+
+    const walletSet = new Set();
+    (stakersData.stakers || []).forEach(s => s.wallet && walletSet.add(s.wallet.toLowerCase()));
+    (lbData.players     || []).forEach(p => p.addr  && walletSet.add(p.addr.toLowerCase()));
+
+    const wallets = [...walletSet];
+    if (!wallets.length) { out.textContent = 'No wallets found in database yet.'; return; }
+
+    out.textContent = 'Scanning ' + wallets.length + ' wallets…';
+
+    const issues = [];
+    for (const wallet of wallets) {
+      const res  = await fetch('/api/db?action=progress-load&wallet=' + encodeURIComponent(wallet));
+      const data = await res.json();
+      if (!data || !data.quests) continue;
+      const stuck = data.quests.filter(q => q.linkStatus === 'pending');
+      if (stuck.length) {
+        issues.push({
+          wallet,
+          username: data.username || '',
+          stuck: stuck.map(q => 'Quest ' + q.id + ' (' + (q.progress||0) + '/' + (q.goal||1) + ')')
+        });
+      }
+    }
+
+    if (!issues.length) {
+      out.textContent = '✅ All ' + wallets.length + ' wallets scanned — no stuck link statuses found!';
+      return;
+    }
+
+    out.textContent = '⚠ Found ' + issues.length + ' wallet(s) with stuck pending status:' + nl + nl +
+      issues.map(w =>
+        'Wallet: ' + w.wallet + (w.username ? ' (' + w.username + ')' : '') + nl +
+        '  Stuck: ' + w.stuck.join(', ')
+      ).join(nl + nl) + nl + nl +
+      'Click ⚡ Auto-Fix All Stuck to clear all of these at once.';
+
+  } catch(e) {
+    out.textContent = 'Error: ' + e.message;
+  }
+}
+
+async function debugFixAllWallets() {
+  const out = document.getElementById('debugOutput');
+  out.style.display = 'block';
+  out.textContent = 'Scanning all wallets for stuck statuses…';
+  const nl = String.fromCharCode(10);
+  try {
+    const [stakersRes, lbRes] = await Promise.all([
+      fetch('/api/db?action=stakers-list'),
+      fetch('/api/db?action=leaderboard'),
+    ]);
+    const stakersData = await stakersRes.json();
+    const lbData      = await lbRes.json();
+
+    const walletSet = new Set();
+    (stakersData.stakers || []).forEach(s => s.wallet && walletSet.add(s.wallet.toLowerCase()));
+    (lbData.players     || []).forEach(p => p.addr  && walletSet.add(p.addr.toLowerCase()));
+
+    const wallets = [...walletSet];
+    if (!wallets.length) { out.textContent = 'No wallets found.'; return; }
+
+    let fixedCount = 0;
+    let walletCount = 0;
+    const log = [];
+
+    for (const wallet of wallets) {
+      const res  = await fetch('/api/db?action=progress-load&wallet=' + encodeURIComponent(wallet));
+      const data = await res.json();
+      if (!data || !data.quests) continue;
+
+      const stuck = data.quests.filter(q => q.linkStatus === 'pending');
+      if (!stuck.length) continue;
+
+      // Clear all stuck statuses for this wallet
+      data.quests.forEach(q => {
+        if (q.linkStatus === 'pending') {
+          q.linkStatus    = null;
+          q.submittedLink = null;
+          fixedCount++;
+        }
+      });
+
+      await fetch('/api/db?action=progress-save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wallet, data: { quests: data.quests } })
+      });
+
+      walletCount++;
+      log.push('Fixed ' + wallet + (data.username ? ' (' + data.username + ')' : '') +
+        ' — cleared ' + stuck.length + ' stuck quest(s)');
+    }
+
+    if (!fixedCount) {
+      out.textContent = '✅ Scanned ' + wallets.length + ' wallets — nothing needed fixing!';
+      return;
+    }
+
+    out.textContent = '✅ Fixed ' + fixedCount + ' stuck status(es) across ' + walletCount + ' wallet(s):' + nl + nl +
+      log.join(nl) + nl + nl +
+      'All affected members can now refresh and resubmit their links.';
+    toast('✅ Auto-fixed ' + fixedCount + ' stuck quest status(es)');
+
+  } catch(e) {
+    out.textContent = 'Error: ' + e.message;
+    toast('❌ Scan failed: ' + e.message);
   }
 }
 
