@@ -752,14 +752,17 @@
     <div class="card" style="margin-bottom:2rem">
       <div class="section-title" style="font-size:1rem"><span class="dot" style="background:#e05555"></span> Wallet Debug Tool</div>
       <p style="font-size:.82rem;color:var(--muted);font-style:italic;margin-bottom:1.2rem">Look up any wallet's saved data and fix stuck quest states.</p>
-      <div class="form-group">
-        <label>Wallet Address</label>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1.2rem">
+        <button class="btn" style="width:auto;padding:.5rem 1.2rem;font-size:.72rem;background:rgba(212,160,23,0.1);border-color:rgba(212,160,23,0.4);color:var(--gold)" onclick="debugCheckQuestDefs()">🔍 Check Quest Definitions</button>
+        <button class="btn btn-success" style="width:auto;padding:.5rem 1.2rem;font-size:.72rem" onclick="debugFixQuestDefs()">🛠 Fix Quest Definitions</button>
+      </div>
+      <div class="form-group" style="margin-top:.8rem">
+        <label>Wallet Address — for clearing a specific member's stuck link status</label>
         <input type="text" id="debugWallet" placeholder="0x..." style="font-family:var(--font-mono);font-size:.8rem" />
       </div>
       <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem">
         <button class="btn btn-success" style="width:auto;padding:.5rem 1.2rem;font-size:.72rem" onclick="debugLoadWallet()">🔍 Load Wallet Data</button>
-        <button class="btn" style="width:auto;padding:.5rem 1.2rem;font-size:.72rem;background:rgba(224,85,85,0.15);border-color:rgba(224,85,85,0.4);color:#e05555" onclick="debugClearAllLinkStatus()">🔄 Clear User Link Statuses</button>
-        <button class="btn" style="width:auto;padding:.5rem 1.2rem;font-size:.72rem;background:rgba(212,160,23,0.1);border-color:rgba(212,160,23,0.4);color:var(--gold)" onclick="debugFixQuestDefs()">🛠 Fix Quest Definitions</button>
+        <button class="btn" style="width:auto;padding:.5rem 1.2rem;font-size:.72rem;background:rgba(224,85,85,0.15);border-color:rgba(224,85,85,0.4);color:#e05555" onclick="debugClearAllLinkStatus()">🔄 Clear Link Statuses</button>
       </div>
       <div id="debugOutput" style="font-family:var(--font-mono);font-size:.72rem;color:var(--muted);background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:8px;padding:1rem;min-height:60px;white-space:pre-wrap;word-break:break-all;display:none"></div>
     </div>
@@ -2257,6 +2260,32 @@ async function debugLoadWallet() {
       'XP: ' + (data.myXP||0) + '  SKLZ: ' + ((data.questSKLZ||0)+(data.totalEarned||0)).toFixed(2) + nl +
       'Pending Rewards: ' + (data.pendingRewards||0).toFixed(4) + nl + nl +
       'QUESTS:' + nl + (questSummary || 'none saved');
+  } catch(e) {
+    out.textContent = 'Error: ' + e.message;
+  }
+}
+
+async function debugCheckQuestDefs() {
+  const out = document.getElementById('debugOutput');
+  out.style.display = 'block';
+  out.textContent = 'Loading quest definitions from database…';
+  const nl = String.fromCharCode(10);
+  try {
+    const res = await fetch('/api/db?action=quests-load');
+    const data = await res.json();
+    if (!data || !data.quests || !data.quests.length) {
+      out.textContent = 'No quest definitions saved in database yet.';
+      return;
+    }
+    out.textContent = 'QUEST DEFINITIONS (' + data.quests.length + ' quests):' + nl + nl +
+      data.quests.map(q =>
+        'id=' + q.id +
+        ' icon=' + (q.icon || 'MISSING ⚠') +
+        ' linkStatus=' + JSON.stringify(q.linkStatus || null) +
+        ' progress=' + (q.progress || 0) +
+        ' claimed=' + (q.claimed || false) + nl +
+        '  title: ' + q.title
+      ).join(nl + nl);
   } catch(e) {
     out.textContent = 'Error: ' + e.message;
   }
