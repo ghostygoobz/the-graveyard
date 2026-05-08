@@ -758,7 +758,8 @@
       </div>
       <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem">
         <button class="btn btn-success" style="width:auto;padding:.5rem 1.2rem;font-size:.72rem" onclick="debugLoadWallet()">🔍 Load Wallet Data</button>
-        <button class="btn" style="width:auto;padding:.5rem 1.2rem;font-size:.72rem;background:rgba(224,85,85,0.15);border-color:rgba(224,85,85,0.4);color:#e05555" onclick="debugClearAllLinkStatus()">🔄 Clear All Link Statuses</button>
+        <button class="btn" style="width:auto;padding:.5rem 1.2rem;font-size:.72rem;background:rgba(224,85,85,0.15);border-color:rgba(224,85,85,0.4);color:#e05555" onclick="debugClearAllLinkStatus()">🔄 Clear User Link Statuses</button>
+        <button class="btn" style="width:auto;padding:.5rem 1.2rem;font-size:.72rem;background:rgba(212,160,23,0.1);border-color:rgba(212,160,23,0.4);color:var(--gold)" onclick="debugFixQuestDefs()">🛠 Fix Quest Definitions</button>
       </div>
       <div id="debugOutput" style="font-family:var(--font-mono);font-size:.72rem;color:var(--muted);background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:8px;padding:1rem;min-height:60px;white-space:pre-wrap;word-break:break-all;display:none"></div>
     </div>
@@ -2216,21 +2217,37 @@ async function loadActiveStakers() {
 // ══════ WALLET DEBUG TOOL ══════
 async function debugLoadWallet() {
   const wallet = document.getElementById('debugWallet').value.trim();
-  if (!wallet) { toast('⚠ Enter a wallet address'); return; }
   const out = document.getElementById('debugOutput');
   out.style.display = 'block';
-  out.textContent = 'Loading…';
+  const nl = String.fromCharCode(10);
+
+  // If no wallet entered, show quest definitions from admin:quests
+  if (!wallet) {
+    out.textContent = 'Loading quest definitions…';
+    try {
+      const res = await fetch('/api/db?action=quests-load');
+      const data = await res.json();
+      if (!data || !data.quests) { out.textContent = 'No quest definitions saved yet.'; return; }
+      out.textContent = 'QUEST DEFINITIONS IN DATABASE:' + nl +
+        data.quests.map(q =>
+          'id=' + q.id + ' icon=' + (q.icon||'MISSING') +
+          ' linkStatus=' + JSON.stringify(q.linkStatus||null) +
+          ' progress=' + (q.progress||0) +
+          ' claimed=' + (q.claimed||false) +
+          ' title=' + q.title
+        ).join(nl);
+    } catch(e) { out.textContent = 'Error: ' + e.message; }
+    return;
+  }
+
+  out.textContent = 'Loading wallet data…';
   try {
     const res = await fetch('/api/db?action=progress-load&wallet=' + encodeURIComponent(wallet));
     const data = await res.json();
-    if (!data) {
-      out.textContent = 'No record found for this wallet.';
-      return;
-    }
-    // Show quest link statuses clearly
-    const nl = String.fromCharCode(10);
+    if (!data) { out.textContent = 'No record found for this wallet.'; return; }
     const questSummary = (data.quests || []).map(q =>
-      'Quest ' + q.id + ': linkStatus=' + JSON.stringify(q.linkStatus) +
+      'id=' + q.id +
+      ' linkStatus=' + JSON.stringify(q.linkStatus) +
       ' submittedLink=' + JSON.stringify(q.submittedLink) +
       ' progress=' + q.progress + '/' + (q.goal||'?') +
       ' claimed=' + q.claimed
@@ -2242,6 +2259,55 @@ async function debugLoadWallet() {
       'QUESTS:' + nl + (questSummary || 'none saved');
   } catch(e) {
     out.textContent = 'Error: ' + e.message;
+  }
+}
+
+async function debugFixQuestDefs() {
+  const out = document.getElementById('debugOutput');
+  out.style.display = 'block';
+  out.textContent = 'Loading quest definitions…';
+  const nl = String.fromCharCode(10);
+  try {
+    const res = await fetch('/api/db?action=quests-load');
+    const data = await res.json();
+    if (!data || !data.quests) { out.textContent = 'No quest definitions found.'; return; }
+
+    let fixed = 0;
+    const cleanQuests = data.quests.map(q => {
+      const clean = {
+        id:           q.id,
+        title:        q.title,
+        desc:         q.desc         || q.description || '',
+        description:  q.description  || q.desc        || '',
+        icon:         q.icon         || '📜',
+        linkLabel:    q.linkLabel    || '',
+        type:         q.type,
+        goal:         q.goal,
+        xp:           q.xp,
+        sklz:         q.sklz,
+        repeatable:   q.repeatable   || false,
+        requiresLink: q.requiresLink || false,
+        noTimer:      q.noTimer      || false,
+      };
+      // Count fields that needed fixing
+      if (q.linkStatus || q.submittedLink || q.progress || q.claimed || !q.icon) fixed++;
+      return clean;
+    });
+
+    await fetch('/api/db?action=quests-save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quests: cleanQuests, config: data.config })
+    });
+
+    out.textContent = '✅ Quest definitions cleaned — ' + fixed + ' quest(s) had stale data.' + nl +
+      'Per-user fields (linkStatus, progress, claimed) removed from shared definitions.' + nl + nl +
+      'Quest icons after fix:' + nl +
+      cleanQuests.map(q => 'id=' + q.id + ' icon=' + q.icon + ' title=' + q.title).join(nl);
+    toast('✅ Quest definitions fixed — ' + fixed + ' cleaned');
+  } catch(e) {
+    out.textContent = 'Error: ' + e.message;
+    toast('❌ Failed: ' + e.message);
   }
 }
 
