@@ -122,7 +122,7 @@
   .connect-btn.connected { border-color: rgba(232,135,58,0.5); color: var(--accent2); background: rgba(232,135,58,0.08); }
 
   /* ── ADMIN PASSWORD GATE ── */
-  .admin-gate { position: fixed; inset: 0; z-index: 500; background: rgba(0,0,0,0.92); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: center; }
+  .admin-gate { position: fixed; inset: 0; z-index: 500; background: rgba(0,0,0,0.92); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: center; }
   .admin-gate-box { background: var(--surface); border: 1px solid rgba(212,160,23,0.35); border-radius: 16px; padding: 2.5rem; width: 360px; max-width: 95vw; text-align: center; box-shadow: 0 0 60px rgba(212,160,23,0.1); }
   .admin-gate-box .lock { font-size: 2.5rem; margin-bottom: 1rem; filter: drop-shadow(0 0 10px rgba(212,160,23,0.5)); }
   .admin-gate-box h2 { font-family: var(--font-head); font-size: 1.1rem; color: var(--gold); margin-bottom: 0.4rem; letter-spacing: 0.1em; }
@@ -1415,7 +1415,7 @@ async function connectWallet(name) {
         state._savedAllTokenIds    = saved.allTokenIds    || [];
         if (saved.quests && Array.isArray(saved.quests)) {
           saved.quests.forEach(sq => {
-            const q = state.quests.find(q => q.id === sq.id);
+            const q = state.quests.find(q => q.id == sq.id);
             if (q) {
               // Always restore user's saved values — direct assignment, no fallback
               // This ensures approved/rejected/pending state is always correct
@@ -1573,14 +1573,14 @@ function claimRewards() {
 }
 
 function autoProgress(questId, val) {
-  const q = state.quests.find(q => q.id === questId);
+  const q = state.quests.find(q => q.id == questId);
   if (!q || q.claimed) return;
   q.progress = Math.min(val, q.goal);
   renderAll();
 }
 
 function claimQuest(id) {
-  const q = state.quests.find(q => q.id === id);
+  const q = state.quests.find(q => q.id == id);
   if (!q) return;
   if (q.progress < q.goal) return;
   if (!q.repeatable && q.claimed) return;
@@ -2344,7 +2344,7 @@ async function debugScanAllWallets() {
       const res  = await fetch('/api/db?action=progress-load&wallet=' + encodeURIComponent(wallet));
       const data = await res.json();
       if (!data || !data.quests) continue;
-      const stuck = data.quests.filter(q => q.linkStatus === 'pending');
+      const stuck = data.quests.filter(q => q.linkStatus === 'pending' || q.linkStatus === 'Pending');
       if (stuck.length) {
         issues.push({
           wallet,
@@ -2400,12 +2400,12 @@ async function debugFixAllWallets() {
       const data = await res.json();
       if (!data || !data.quests) continue;
 
-      const stuck = data.quests.filter(q => q.linkStatus === 'pending');
+      const stuck = data.quests.filter(q => q.linkStatus && q.linkStatus.toLowerCase() === 'pending');
       if (!stuck.length) continue;
 
       // Clear all stuck statuses for this wallet
       data.quests.forEach(q => {
-        if (q.linkStatus === 'pending') {
+        if (q.linkStatus && q.linkStatus.toLowerCase() === 'pending') {
           q.linkStatus    = null;
           q.submittedLink = null;
           fixedCount++;
@@ -2625,7 +2625,7 @@ function submitQuestLink(questId) {
   if (!input) return;
   const url = input.value.trim();
   if (!url || !url.startsWith('http')) { toast('⚠ Please enter a valid URL starting with http'); return; }
-  const q = state.quests.find(q => q.id === questId);
+  const q = state.quests.find(q => q.id == questId);
   if (!q) return;
 
   // Remove any prior rejected submission for this quest
@@ -2651,7 +2651,7 @@ function submitQuestLink(questId) {
   renderQuests();
   renderLinkReview();
   saveSubmissions();
-  scheduleSave(); // also save the quest's linkStatus on the user's record
+  persistProgress(); // save immediately so linkStatus:pending is in DB right away
 }
 
 // ══════ ADMIN LINK REVIEW ══════
@@ -2740,7 +2740,7 @@ async function reviewLink(submissionId, decision) {
   if (!sub) return;
   sub.status = decision;
 
-  const q = state.quests.find(q => q.id === sub.questId);
+  const q = state.quests.find(q => q.id == sub.questId);
   if (q) {
     q.linkStatus = decision;
     if (decision === 'approved') {
@@ -2767,23 +2767,34 @@ async function reviewLink(submissionId, decision) {
       if (res.ok) {
         const saved = await res.json();
         if (saved && saved.quests && Array.isArray(saved.quests)) {
-          const savedQ = saved.quests.find(sq => sq.id === sub.questId);
+          // Use == not === to handle string/number mismatch in stored IDs
+          const savedQ = saved.quests.find(sq => sq.id == sub.questId);
           if (savedQ) {
             if (decision === 'approved') {
               savedQ.linkStatus = 'approved';
-              savedQ.progress   = savedQ.goal || q.goal;
+              savedQ.progress   = savedQ.goal || (q ? q.goal : 1);
             } else {
-              // Rejected — clear so they can resubmit
               savedQ.linkStatus    = null;
               savedQ.submittedLink = null;
             }
-            await fetch('/api/db?action=progress-save', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ wallet: reviewWallet, data: { quests: saved.quests } })
+          } else {
+            // Quest not in saved record yet — create it
+            console.warn('[review] Quest ' + sub.questId + ' not in saved record, adding it');
+            if (!saved.quests) saved.quests = [];
+            saved.quests.push({
+              id:          sub.questId,
+              linkStatus:  decision === 'approved' ? 'approved' : null,
+              submittedLink: decision === 'approved' ? sub.url : null,
+              progress:    decision === 'approved' ? (q ? q.goal : 1) : 0,
+              claimed:     false,
             });
-            console.log('[review] Pushed ' + decision + ' to ' + reviewWallet + ' quest ' + sub.questId);
           }
+          await fetch('/api/db?action=progress-save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet: reviewWallet, data: { quests: saved.quests } })
+          });
+          console.log('[review] Pushed ' + decision + ' to ' + reviewWallet + ' quest ' + sub.questId);
         }
       }
     } catch(e) {
@@ -2972,7 +2983,17 @@ window.addEventListener('beforeunload', function() {
         stakedTokenIds: state.nfts.filter(n => n.staked).map(n => n.tokenId),
       }
     });
-    navigator.sendBeacon('/api/db?action=progress-save', new Blob([payload], { type: 'application/json' }));
+    // sendBeacon is the most reliable on page close; fallback to sync XHR for older browsers
+    try {
+      navigator.sendBeacon('/api/db?action=progress-save', new Blob([payload], { type: 'application/json' }));
+    } catch(e) {
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/db?action=progress-save', false); // false = synchronous
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send(payload);
+      } catch(e2) { /* best effort */ }
+    }
   }
 });
 
