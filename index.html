@@ -85,6 +85,7 @@
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 2rem; height: 68px;
     background: rgba(8,4,10,0.92);
+    -webkit-backdrop-filter: blur(20px);
     backdrop-filter: blur(20px);
     border-bottom: 1px solid rgba(155,48,208,0.2);
     box-shadow: 0 2px 40px rgba(74,16,96,0.4);
@@ -135,7 +136,7 @@
   .admin-gate-box .gate-error { font-size: 0.75rem; color: var(--accent3); margin-top: 0.5rem; min-height: 1rem; }
 
   /* ── LAYOUT ── */
-  main { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+  main { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; -webkit-overflow-scrolling: touch; }
   .page { display: none; }
   .page.active { display: block; animation: riseIn .4s ease; }
   @keyframes riseIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
@@ -328,6 +329,7 @@
   .shop-buy:disabled { background: var(--surface2); color: var(--muted); cursor: not-allowed; box-shadow: none; filter: none; }
 
   /* ── PURCHASE CODE MODAL ── */
+  .code-modal { position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,0.82); -webkit-backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .25s; }
   .code-modal { position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,0.82); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .25s; }
   .code-modal.open { opacity: 1; pointer-events: all; }
   .code-box { background: linear-gradient(145deg, rgba(25,15,22,0.99), rgba(15,8,14,0.99)); border: 1px solid rgba(232,135,58,0.3); border-radius: 16px; padding: 2rem; width: 440px; max-width: 95vw; text-align: center; transform: scale(0.95); transition: transform .25s; box-shadow: 0 0 60px rgba(232,135,58,0.1); }
@@ -381,6 +383,7 @@
   #toast.show { transform: none; opacity: 1; }
 
   /* ── WALLET MODAL ── */
+  .modal-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.8); -webkit-backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .25s; }
   .modal-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .25s; }
   .modal-overlay.open { opacity: 1; pointer-events: all; }
   .modal { background: linear-gradient(145deg, rgba(22,12,20,0.99), rgba(12,6,14,0.99)); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; width: 360px; max-width: 95vw; transform: scale(0.95); transition: transform .25s; box-shadow: 0 0 60px rgba(155,48,208,0.12); }
@@ -1319,9 +1322,15 @@ async function connectWallet(name) {
   closeWalletModal();
 
   // ── 1. Check MetaMask / injected provider exists ──
-  if (!window.ethereum) {
-    toast('⚠ No wallet detected. Install MetaMask or another EVM wallet.');
+  // Check for wallet — works with MetaMask, Coinbase Wallet, Rainbow, Trust Wallet etc.
+  const provider = window.ethereum || window.web3?.currentProvider;
+  if (!provider) {
+    toast('⚠ No wallet detected. Please install MetaMask, Coinbase Wallet, or another EVM wallet to connect.');
     return;
+  }
+  // Ensure window.ethereum points to the available provider
+  if (!window.ethereum && window.web3?.currentProvider) {
+    window.ethereum = window.web3.currentProvider;
   }
 
   try {
