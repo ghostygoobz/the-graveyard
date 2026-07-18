@@ -253,6 +253,61 @@ module.exports = async function handler(req, res) {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
+  // SEASON RESET
+  // ══════════════════════════════════════════════════════════════════════════
+  if (action === 'season-reset') {
+    if (req.method !== 'POST') return res.status(405).end();
+    const redis = getRedis();
+    if (!redis) return res.status(200).json({ ok: true, note: 'storage not configured' });
+
+    const { resetXP, resetSKLZ, resetQ, season, pastSeasons } = req.body;
+
+    // 1. Delete leaderboard sorted set entirely
+    await redis.del('leaderboard');
+
+    // 2. Save new season info and past seasons archive
+    await redis.set('admin:season', { current: season, pastSeasons: pastSeasons || [], updatedAt: Date.now() });
+
+    // 3. If resetting XP/SKLZ/quests — update every known wallet
+    if (resetXP || resetSKLZ || resetQ) {
+      const wallets = await redis.smembers('admin:staker-wallets');
+      // Also get leaderboard members (already deleted but check stakers)
+      const allWallets = [...new Set(wallets || [])];
+
+      for (const wallet of allWallets) {
+        const key    = 'user:' + wallet;
+        const record = await redis.get(key);
+        if (!record) continue;
+
+        if (resetXP) {
+          record.myXP         = 0;
+          record.myQuestsDone = 0;
+        }
+        if (resetSKLZ) {
+          record.totalEarned   = 0;
+          record.questSKLZ     = 0;
+          record.pendingRewards = 0;
+        }
+        if (resetQ && record.quests) {
+          record.quests = record.quests.map(q => ({
+            ...q,
+            progress:     0,
+            claimed:      false,
+            linkStatus:   null,
+            submittedLink: null,
+            claimCount:   0,
+            lastClaimed:  null,
+          }));
+        }
+        record.updatedAt = Date.now();
+        await redis.set(key, record);
+      }
+    }
+
+    return res.status(200).json({ ok: true, walletsReset: true });
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
   // ADMIN AUTH — password checked server-side, never exposed in HTML
   // ══════════════════════════════════════════════════════════════════════════
   if (action === 'admin-auth') {
