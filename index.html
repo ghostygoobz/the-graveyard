@@ -3104,7 +3104,7 @@ function confirmSeasonReset() {
   modal.classList.add('open');
 }
 
-function executeSeasonReset() {
+async function executeSeasonReset() {
   const modal = document.getElementById('seasonConfirmModal');
   const nextName  = modal.dataset.nextName;
   const resetXP   = modal.dataset.resetXP === 'true';
@@ -3114,7 +3114,7 @@ function executeSeasonReset() {
   // Build snapshot before wiping
   const allPlayers = [...state.leaderboard];
   if (state.connected && state.myXP > 0)
-    allPlayers.push({ name: 'You', xp: state.myXP, quests: state.myQuestsDone, addr: state.address || '0xYou' });
+    allPlayers.push({ name: state.profile.username || 'You', xp: state.myXP, quests: state.myQuestsDone, addr: state.address || '0xYou' });
   allPlayers.sort((a,b) => b.xp - a.xp);
 
   // Archive current season
@@ -3124,13 +3124,46 @@ function executeSeasonReset() {
     snapshot: allPlayers,
   });
 
-  // Wipe leaderboard
+  // ── Wipe leaderboard in DATABASE ─────────────────────────────────────────
+  toast('⏳ Resetting season — clearing database…');
+  try {
+    await fetch('/api/db?action=season-reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        resetXP,
+        resetSKLZ,
+        resetQ,
+        season: {
+          number:    state.season.number + 1,
+          name:      nextName,
+          startDate: new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}),
+        },
+        pastSeasons: state.pastSeasons,
+      })
+    });
+  } catch(e) {
+    console.warn('[season] DB reset failed:', e.message);
+    toast('⚠ Could not clear database — leaderboard may reload old scores');
+  }
+
+  // ── Wipe local state ──────────────────────────────────────────────────────
   state.leaderboard = [];
 
-  // Conditional resets
+  // Conditional resets for current user
   if (resetXP)   { state.myXP = 0; state.myQuestsDone = 0; }
-  if (resetSKLZ) { state.totalEarned = 0; state.questSKLZ = 0; state.pendingRewards = 0; document.getElementById('pendingRewards').textContent = '0.00 SKLZ'; }
-  if (resetQ)    { state.quests.forEach(q => { q.progress = 0; q.claimed = false; }); }
+  if (resetSKLZ) {
+    state.totalEarned = 0; state.questSKLZ = 0; state.pendingRewards = 0;
+    const prEl = document.getElementById('pendingRewards');
+    if (prEl) prEl.textContent = '0.00 SKLZ';
+  }
+  if (resetQ) {
+    state.quests.forEach(q => {
+      q.progress = 0; q.claimed = false;
+      q.linkStatus = null; q.submittedLink = null;
+      q.claimCount = 0; q.lastClaimed = null;
+    });
+  }
 
   // Advance season counter
   state.season = {
@@ -3139,9 +3172,14 @@ function executeSeasonReset() {
     startDate: new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}),
   };
 
+  // Save current user's reset state
+  if (state.connected && state.fullAddress) {
+    await persistProgress();
+  }
+
   document.getElementById('nextSeasonName').value = '';
   modal.classList.remove('open');
-  toast('🎉 ' + nextName + ' has begun!');
+  toast('🎉 ' + nextName + ' has begun! Leaderboard cleared.');
   renderAll();
   renderSeasonPanel();
 }
