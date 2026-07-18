@@ -44,8 +44,12 @@ module.exports = async function handler(req, res) {
     const existing = (await redis.get(key)) || {};
     const record = { ...existing, ...data, wallet: wallet.toLowerCase(), updatedAt: Date.now() };
     await redis.set(key, record);
-    if (typeof data.myXP === 'number') {
+    // Only add to leaderboard if XP > 0 — prevents re-adding after season reset
+    if (typeof data.myXP === 'number' && data.myXP > 0) {
       await redis.zadd('leaderboard', { score: data.myXP, member: wallet.toLowerCase() });
+    } else if (typeof data.myXP === 'number' && data.myXP === 0) {
+      // XP explicitly zeroed (season reset) — remove from leaderboard
+      try { await redis.zrem('leaderboard', wallet.toLowerCase()); } catch(e) {}
     }
     return res.status(200).json({ ok: true });
   }
