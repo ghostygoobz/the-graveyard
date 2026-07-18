@@ -907,6 +907,7 @@ let state = {
   ],
   shopItems: [],
   leaderboard: [],
+  seasonJustReset: false,
   nextQuestId: 7,
   nextShopId: 1,
   rewardInterval: null,
@@ -1038,6 +1039,7 @@ async function loadLeaderboard() {
     const data = await res.json();
     if (data.players) {
       // Store all real players — shown to everyone, wallet connected or not
+      if (data.players.length > 0) state.seasonJustReset = false;
       state.leaderboard = data.players.map(p => ({
         addr:      p.shortAddr,
         fullAddr:  p.addr,
@@ -1598,6 +1600,7 @@ function claimQuest(id) {
   state.myXP += q.xp;
   state.questSKLZ += q.sklz;
   state.myQuestsDone++;
+  state.seasonJustReset = false; // new XP earned — show on leaderboard
   toast('🎉 Quest complete! +' + q.xp + ' XP  +' + q.sklz + ' SKLZ');
   if (state.myQuestsDone >= 5) autoProgress(5, state.myQuestsDone);
   if (q.repeatable) {
@@ -1857,11 +1860,22 @@ function renderQuests() {
 
 // ══════ RENDER LEADERBOARD ══════
 function renderLeaderboard() {
+  const el = document.getElementById('leaderboard');
+  if (!el) return;
+  // During/after season reset show empty board
+  if (state.seasonJustReset) {
+    el.innerHTML = '<div class="empty"><div class="icon">🏆</div><div style="font-style:italic;font-size:.85rem">New season started — be the first to earn XP!</div></div>';
+    return;
+  }
   const all = [...state.leaderboard];
   if (state.connected && state.myXP > 0) all.push({addr: state.address||'0xYou', emoji:'😎', name:'You', xp:state.myXP, quests:state.myQuestsDone, isMe:true});
   all.sort((a,b) => b.xp - a.xp);
+  if (!all.length) {
+    el.innerHTML = '<div class="empty"><div class="icon">💀</div><div style="font-style:italic;font-size:.85rem">No members on the leaderboard yet — be the first to earn XP!</div></div>';
+    return;
+  }
   const medals = {0:'🥇',1:'🥈',2:'🥉'};
-  document.getElementById('leaderboard').innerHTML = all.map((p,i) => {
+  el.innerHTML = all.map((p,i) => {
     // For the current user, use their profile name/avatar if set
     const displayName = p.isMe && state.profile.username ? state.profile.username : (p.name || p.addr);
     const avatarContent = p.isMe && state.profile.avatarB64
@@ -3179,9 +3193,21 @@ async function executeSeasonReset() {
 
   document.getElementById('nextSeasonName').value = '';
   modal.classList.remove('open');
+
+  // Flag so renderLeaderboard shows empty immediately
+  state.seasonJustReset = true;
+  state.leaderboard = [];
+
   toast('🎉 ' + nextName + ' has begun! Leaderboard cleared.');
   renderAll();
   renderSeasonPanel();
+
+  // Confirm DB cleared by reloading leaderboard after short delay
+  setTimeout(async () => {
+    await loadLeaderboard();
+    // If DB cleared correctly leaderboard will still be empty
+    // Keep the reset flag until new XP is earned
+  }, 2000);
 }
 
 document.getElementById('seasonConfirmModal').addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
