@@ -3119,52 +3119,26 @@ function confirmSeasonReset() {
 }
 
 async function executeSeasonReset() {
-  const modal = document.getElementById('seasonConfirmModal');
+  const modal     = document.getElementById('seasonConfirmModal');
   const nextName  = modal.dataset.nextName;
-  const resetXP   = modal.dataset.resetXP === 'true';
+  const resetXP   = modal.dataset.resetXP   === 'true';
   const resetSKLZ = modal.dataset.resetSKLZ === 'true';
-  const resetQ    = modal.dataset.resetQ === 'true';
+  const resetQ    = modal.dataset.resetQ    === 'true';
 
-  // Build snapshot before wiping
+  // Build snapshot BEFORE wiping so archive has correct data
   const allPlayers = [...state.leaderboard];
   if (state.connected && state.myXP > 0)
     allPlayers.push({ name: state.profile.username || 'You', xp: state.myXP, quests: state.myQuestsDone, addr: state.address || '0xYou' });
   allPlayers.sort((a,b) => b.xp - a.xp);
-
-  // Archive current season
   state.pastSeasons.push({
     name: state.season.name,
     endDate: new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}),
     snapshot: allPlayers,
   });
 
-  // ── Wipe leaderboard in DATABASE ─────────────────────────────────────────
-  toast('⏳ Resetting season — clearing database…');
-  try {
-    await fetch('/api/db?action=season-reset', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        resetXP,
-        resetSKLZ,
-        resetQ,
-        season: {
-          number:    state.season.number + 1,
-          name:      nextName,
-          startDate: new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}),
-        },
-        pastSeasons: state.pastSeasons,
-      })
-    });
-  } catch(e) {
-    console.warn('[season] DB reset failed:', e.message);
-    toast('⚠ Could not clear database — leaderboard may reload old scores');
-  }
-
-  // ── Wipe local state ──────────────────────────────────────────────────────
-  state.leaderboard = [];
-
-  // Conditional resets for current user
+  // ── Step 1: Zero local state FIRST ───────────────────────────────────────
+  state.seasonJustReset = true;
+  state.leaderboard     = [];
   if (resetXP)   { state.myXP = 0; state.myQuestsDone = 0; }
   if (resetSKLZ) {
     state.totalEarned = 0; state.questSKLZ = 0; state.pendingRewards = 0;
@@ -3178,36 +3152,50 @@ async function executeSeasonReset() {
       q.claimCount = 0; q.lastClaimed = null;
     });
   }
-
-  // Advance season counter
   state.season = {
-    number: state.season.number + 1,
-    name: nextName,
+    number:    state.season.number + 1,
+    name:      nextName,
     startDate: new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}),
   };
 
-  // Save current user's reset state
+  toast('⏳ Resetting — clearing leaderboard from database…');
+  renderAll();
+  renderSeasonPanel();
+  document.getElementById('nextSeasonName').value = '';
+  modal.classList.remove('open');
+
+  // ── Step 2: Clear DB leaderboard sorted set ───────────────────────────────
+  try {
+    const r = await fetch('/api/db?action=season-reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        resetXP, resetSKLZ, resetQ,
+        season: { number: state.season.number, name: nextName, startDate: state.season.startDate },
+        pastSeasons: state.pastSeasons,
+      })
+    });
+    const d = await r.json();
+    console.log('[season] DB reset result:', d);
+  } catch(e) {
+    console.warn('[season] DB reset failed:', e.message);
+    toast('⚠ Could not reach server to clear DB leaderboard');
+    return;
+  }
+
+  // ── Step 3: Save current user's zeroed progress ───────────────────────────
+  // myXP is now 0 so progress-save will NOT re-add to leaderboard sorted set
   if (state.connected && state.fullAddress) {
     await persistProgress();
   }
 
-  document.getElementById('nextSeasonName').value = '';
-  modal.classList.remove('open');
-
-  // Flag so renderLeaderboard shows empty immediately
-  state.seasonJustReset = true;
-  state.leaderboard = [];
-
   toast('🎉 ' + nextName + ' has begun! Leaderboard cleared.');
-  renderAll();
-  renderSeasonPanel();
 
-  // Confirm DB cleared by reloading leaderboard after short delay
+  // ── Step 4: Reload from DB after 1.5s to confirm empty ───────────────────
   setTimeout(async () => {
     await loadLeaderboard();
-    // If DB cleared correctly leaderboard will still be empty
-    // Keep the reset flag until new XP is earned
-  }, 2000);
+    renderSeasonPanel();
+  }, 1500);
 }
 
 document.getElementById('seasonConfirmModal').addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
